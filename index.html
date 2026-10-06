@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Гала-розіграш</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: an amphitheatre hall map (6 sectors in an arc around the stage) with the draw console set into the hollow of the arc; winners strip beneath. */
+:root {
+  --bg: #0a0a0b;
+  --bg-2: #131315;
+  --line: #2a2a2e;
+  --seat-dim: #26262a;
+  --seat: #56565c;
+  --muted: #8b8b91;
+  --silver: #c8c8cc;
+  --fg: #f4f4f2;
+  --white: #ffffff;
+  --display: "Cormorant Garamond", "Cormorant", Georgia, "Times New Roman", serif;
+  --body: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 70% 55% at 50% 0%, rgba(255,255,255,.07), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(255,255,255,.035), transparent 70%);
+  color: var(--fg);
+  font-family: var(--body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); outline-offset: 3px; }
+
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-inline: clamp(16px, 3vw, 40px);
+  padding-block: 18px 22px;
+}
+
+/* ---------- Header ---------- */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 24px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+.brand { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: .28em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+}
+.brand h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(30px, 3.4vw, 46px);
+  line-height: 1;
+  letter-spacing: .01em;
+  text-wrap: balance;
+}
+.brand h1 em { font-style: italic; color: var(--silver); font-weight: 400; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.tool {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 8px 12px;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color .2s, border-color .2s, background .2s;
+}
+.tool:hover { color: var(--fg); border-color: var(--seat); }
+.tool[aria-pressed="true"] { color: var(--bg); background: var(--silver); border-color: var(--silver); }
+.tool.warn { color: var(--fg); border-color: var(--fg); }
+.tool svg { width: 14px; height: 14px; flex: none; }
+
+/* ---------- Hall ---------- */
+.hall-wrap { flex: 1; display: flex; justify-content: center; align-items: center; min-height: 0; }
+.stage {
+  position: relative;
+  width: min(100%, calc((100dvh - 250px) * 1.79), 1500px);
+  min-width: min(100%, 320px);
+  container-type: inline-size;
+  container-name: hall;
+}
+#hall { display: block; width: 100%; height: auto; overflow: visible; user-select: none; }
+
+.seat { fill: var(--seat); transition: fill .45s ease-out; }
+.sector-label { fill: var(--muted); font-family: var(--body); font-size: 15px; font-weight: 600; letter-spacing: .3em; transition: fill .3s; }
+.sector-count { fill: var(--seat); font-family: var(--display); font-size: 17px; font-style: italic; letter-spacing: .04em; }
+.row-label { fill: var(--seat); font-family: var(--body); font-size: 10px; font-weight: 600; transition: fill .3s; }
+.stage-shape { fill: var(--bg-2); stroke: var(--line); }
+.stage-text { fill: var(--muted); font-family: var(--body); font-size: 13px; letter-spacing: .6em; font-weight: 600; }
+
+.seat.won { fill: none !important; stroke: var(--silver); stroke-width: 1.4; }
+.seat.excluded { fill: none !important; stroke: var(--seat-dim); stroke-width: 1.2; }
+#hall.editing .seat { cursor: pointer; }
+#hall.editing .seat:hover { fill: var(--fg); }
+
+#hall.drawing .seat { fill: var(--seat-dim); }
+#hall.drawing .seat.spark { fill: var(--fg); transition: none; }
+#hall.drawing .sector.hl .seat { fill: var(--silver); transition: none; }
+#hall.drawing .sector.hl .sector-label { fill: var(--fg); }
+#hall.drawing .sector.locked .seat { fill: var(--seat); }
+#hall.drawing .sector.locked .sector-label { fill: var(--fg); }
+#hall.drawing .sector.locked .row.hl .seat { fill: var(--fg); transition: none; }
+#hall.drawing .sector.locked .row.locked .seat { fill: var(--silver); }
+#hall.drawing .sector.locked .row.locked .seat.hl { fill: var(--white); transition: none; }
+#hall .seat.winner { fill: var(--white) !important; stroke: none; }
+
+#halo { pointer-events: none; transition: opacity .3s; }
+.ring {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 1.2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ring 2.4s cubic-bezier(.2,.6,.3,1) infinite;
+  pointer-events: none;
+}
+@keyframes ring {
+  from { transform: scale(.4); opacity: .95; }
+  to { transform: scale(6); opacity: 0; }
+}
+
+/* ---------- Console in the hollow ---------- */
+.panel {
+  position: absolute;
+  left: 21%;
+  width: 58%;
+  top: 30%;
+  height: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.1cqw;
+  text-align: center;
+}
+.panel .eyebrow { font-size: max(10px, .85cqw); display: flex; gap: 1em; align-items: center; justify-content: center; flex-wrap: wrap; }
+.panel .eyebrow i { width: 4px; height: 4px; background: var(--seat); border-radius: 50%; display: inline-block; }
+.prize {
+  width: min(100%, 34cqw);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
+  font-family: var(--display);
+  font-style: italic;
+  font-size: max(18px, 2.1cqw);
+  text-align: center;
+  padding: .2em .4em .3em;
+  transition: border-color .2s;
+}
+.prize::placeholder { color: var(--seat); }
+.prize:focus { outline: none; border-color: var(--silver); }
+.reels { display: flex; gap: 1.6cqw; justify-content: center; }
+.reel {
+  width: 13.5cqw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5cqw;
+  padding: 1.1cqw .6cqw 1cqw;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 60%), var(--bg);
+  position: relative;
+  overflow: hidden;
+  transition: border-color .4s, box-shadow .4s;
+}
+.reel-label { font-size: max(9px, .78cqw); letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .3em; }
+.reel-val {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 6.4cqw;
+  line-height: 1;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--seat);
+  min-height: 1em;
+  display: block;
+  transition: color .3s;
+}
+.reel.active .reel-val { color: var(--silver); }
+.reel.locked { border-color: var(--silver); box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 0 40px rgba(255,255,255,.08); }
+.reel.locked .reel-val { color: var(--white); }
+.reel.locked::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: sheen 1s ease-out forwards;
+}
+@keyframes sheen { to { transform: translateX(100%); } }
+.bump { animation: bump .16s ease-out; }
+@keyframes bump { from { transform: translateY(-22%); opacity: .35; filter: blur(2px); } to { transform: none; opacity: 1; filter: none; } }
+
+.draw-btn {
+  position: relative;
+  overflow: hidden;
+  background: var(--fg);
+  color: var(--bg);
+  border: 0;
+  padding: 1.05cqw 3.4cqw;
+  min-height: 44px;
+  font-size: max(12px, 1cqw);
+  font-weight: 700;
+  letter-spacing: .34em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .25s, color .25s, transform .15s;
+}
+.draw-btn::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.9) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: sweep 3.6s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes sweep { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.draw-btn:hover { background: var(--white); }
+.draw-btn:active { transform: scale(.98); }
+.draw-btn:disabled { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); cursor: default; }
+.draw-btn:disabled::after { display: none; }
+.hint { font-size: max(10px, .8cqw); color: var(--seat); letter-spacing: .08em; min-height: 1.4em; }
+.hint button { background: none; border: 0; padding: 0; color: var(--silver); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px; color: var(--muted); font-size: .95em; }
+
+@container hall (max-width: 760px) {
+  .panel { position: static; width: 100%; height: auto; gap: 16px; padding-top: 18px; }
+  .prize { width: min(100%, 320px); font-size: 20px; }
+  .reels { gap: 10px; width: 100%; }
+  .reel { width: auto; flex: 1; max-width: 120px; padding: 10px 4px; gap: 6px; }
+  .reel-val { font-size: 46px; }
+  .reel-label { font-size: 9px; letter-spacing: .2em; }
+  .draw-btn { padding: 14px 34px; font-size: 12px; }
+  .hint { font-size: 11px; }
+  .panel .eyebrow { font-size: 10px; }
+}
+
+/* ---------- Winners ---------- */
+.winners { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.winners-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
+.winners-head h2 { margin: 0; font-family: var(--display); font-weight: 500; font-size: 22px; }
+.winners-head h2 em { color: var(--muted); font-size: 18px; margin-left: .3em; }
+#winList { list-style: none; margin: 0; padding: 0 0 4px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; }
+.win {
+  flex: none;
+  min-width: 190px;
+  max-width: 260px;
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  align-items: baseline;
+  cursor: pointer;
+  background: transparent;
+  text-align: left;
+  transition: border-color .2s;
+}
+.win:hover { border-color: var(--seat); }
+.win-no { font-family: var(--display); font-size: 26px; line-height: 1; color: var(--silver); grid-row: span 2; font-variant-numeric: lining-nums; }
+.win-seat { font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.win-prize { color: var(--muted); font-family: var(--display); font-style: italic; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.win.new { animation: winIn .6s cubic-bezier(.2,.7,.2,1); border-color: var(--silver); }
+@keyframes winIn { from { opacity: 0; transform: translateY(8px); } }
+.empty { color: var(--seat); font-style: italic; font-family: var(--display); font-size: 17px; padding: 6px 0; }
+
+/* ---------- Reveal ---------- */
+.reveal {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: rgba(6,6,7,.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn .5s ease-out;
+  overflow: hidden;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+.rays {
+  position: absolute;
+  width: 220vmax; height: 220vmax;
+  left: 50%; top: 50%;
+  margin: -110vmax 0 0 -110vmax;
+  background: repeating-conic-gradient(from 0deg, rgba(255,255,255,.045) 0deg 4deg, transparent 4deg 15deg);
+  -webkit-mask: radial-gradient(circle, #000 0%, transparent 42%);
+  mask: radial-gradient(circle, #000 0%, transparent 42%);
+  animation: spin 60s linear infinite;
+  pointer-events: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.reveal-card {
+  position: relative;
+  width: min(100%, 980px);
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+  gap: clamp(14px, 2.4vh, 26px);
+  padding: clamp(28px, 5vh, 56px) clamp(16px, 4vw, 56px);
+  border-top: 1px solid var(--silver);
+  border-bottom: 1px solid var(--silver);
+  background: radial-gradient(ellipse at 50% 40%, rgba(255,255,255,.06), transparent 70%);
+}
+.reveal-card .eyebrow { animation: up .7s .1s both cubic-bezier(.2,.7,.2,1); }
+.reveal-title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-style: italic;
+  font-size: clamp(34px, 5.2vw, 72px);
+  line-height: 1;
+  animation: up .8s .2s both cubic-bezier(.2,.7,.2,1);
+}
+.reveal-prize { font-size: clamp(13px, 1.3vw, 16px); letter-spacing: .26em; text-transform: uppercase; color: var(--silver); font-weight: 600; animation: up .8s .3s both cubic-bezier(.2,.7,.2,1); }
+.reveal-nums { display: flex; justify-content: center; align-items: stretch; width: 100%; }
+.rv {
+  flex: 1; max-width: 260px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding-inline: 8px;
+  animation: up .9s both cubic-bezier(.2,.7,.2,1);
+}
+.rv + .rv { border-left: 1px solid var(--line); }
+.rv:nth-child(1) { animation-delay: .45s; }
+.rv:nth-child(2) { animation-delay: .7s; }
+.rv:nth-child(3) { animation-delay: .95s; }
+.rv-label { font-size: clamp(10px, 1vw, 13px); letter-spacing: .34em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .34em; }
+.rv-num {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(72px, 13vw, 190px);
+  line-height: .9;
+  font-variant-numeric: lining-nums;
+  background: linear-gradient(180deg, #ffffff 0%, #e6e6e6 45%, #9a9a9e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.reveal-btn {
+  margin-top: 6px;
+  background: transparent;
+  border: 1px solid var(--silver);
+  color: var(--fg);
+  padding: 13px 30px;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  animation: up .8s 1.3s both;
+  transition: background .2s, color .2s;
+}
+.reveal-btn:hover { background: var(--fg); color: var(--bg); }
+@keyframes up { from { opacity: 0; transform: translateY(18px); } }
+
+.tip {
+  position: fixed; z-index: 40; pointer-events: none;
+  background: var(--fg); color: var(--bg);
+  font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  padding: 6px 10px;
+  transform: translate(-50%, calc(-100% - 12px));
+  white-space: nowrap;
+}
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+  transform: translateX(-50%);
+  background: var(--fg); color: var(--bg);
+  padding: 10px 18px; font-weight: 600; font-size: 13px;
+  max-width: calc(100% - 32px);
+  animation: up .3s ease-out;
+}
+
+@media (max-width: 560px) {
+  .tool span { display: none; }
+  .tool { padding: 9px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring, .rays, .draw-btn::after { animation: none; }
+  .ring { opacity: .6; transform: scale(2.5); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Турнір · Гала-вечір</span>
+      <h1>Розіграш <em>призів</em></h1>
+    </div>
+    <div class="tools">
+      <button class="tool" id="editBtn" aria-pressed="false" title="Позначте місця, де ніхто не сидить">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M4 12 12 4"/></svg><span>Вільні місця</span>
+      </button>
+      <button class="tool" id="repeatBtn" aria-pressed="true" title="Місця, що вже виграли, не беруть участі">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 8.5 6.5 12 13 4.5"/></svg><span>Без повторів</span>
+      </button>
+      <button class="tool" id="soundBtn" aria-pressed="true" title="Звук">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 6h2.5l3.5-3v10L5 10H2.5z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9"/></svg><span>Звук</span>
+      </button>
+      <button class="tool" id="fsBtn" title="На весь екран (F)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg><span>Екран</span>
+      </button>
+      <button class="tool" id="resetBtn" title="Очистити список переможців">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg><span>Очистити</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="hall-wrap">
+    <div class="stage" id="stage">
+      <svg id="hall" viewBox="-680 -700 1360 770" role="img" aria-label="Схема залу: 6 секторів, по 5 рядів"></svg>
+      <div class="panel" id="panel">
+        <div class="eyebrow"><span id="drawNo">Розіграш № 1</span><i></i><span id="poolCount">718 місць у грі</span></div>
+        <input class="prize" id="prize" type="text" maxlength="60" placeholder="Назва призу" autocomplete="off" aria-label="Назва призу">
+        <div class="reels">
+          <div class="reel" id="reelS"><span class="reel-label">Сектор</span><span class="reel-val">–</span></div>
+          <div class="reel" id="reelR"><span class="reel-label">Ряд</span><span class="reel-val">–</span></div>
+          <div class="reel" id="reelN"><span class="reel-label">Місце</span><span class="reel-val">–</span></div>
+        </div>
+        <button class="draw-btn" id="drawBtn">Розіграти</button>
+        <div class="hint" id="hint">або натисніть <kbd>Пробіл</kbd></div>
+      </div>
+    </div>
+  </main>
+
+  <section class="winners" aria-label="Переможці">
+    <div class="winners-head">
+      <h2>Переможці <em id="winCount"></em></h2>
+      <span class="eyebrow" id="hallStats">6 секторів · 30 рядів · 718 місць</span>
+    </div>
+    <ol id="winList"></ol>
+  </section>
+</div>
+
+<div class="reveal" id="reveal" hidden>
+  <div class="rays"></div>
+  <canvas id="confetti"></canvas>
+  <div class="reveal-card" role="dialog" aria-modal="true" aria-labelledby="revealTitle">
+    <span class="eyebrow" id="revealNo">Розіграш № 1</span>
+    <h2 class="reveal-title" id="revealTitle">Вітаємо переможця</h2>
+    <div class="reveal-prize" id="revealPrize"></div>
+    <div class="reveal-nums">
+      <div class="rv"><span class="rv-label">Сектор</span><span class="rv-num" id="rvS">1</span></div>
+      <div class="rv"><span class="rv-label">Ряд</span><span class="rv-num" id="rvR">1</span></div>
+      <div class="rv"><span class="rv-label">Місце</span><span class="rv-num" id="rvN">1</span></div>
+    </div>
+    <button class="reveal-btn" id="revealClose">Продовжити</button>
+  </div>
+</div>
+<div class="tip" id="tip" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  // ---------- Hall data: seats per row (rows 1–5) ----------
+  const SECTORS = [
+    [22, 22, 22, 22, 26],
+    [29, 29, 29, 29, 34],
+    [19, 19, 19, 19, 24],
+    [19, 19, 19, 19, 24],
+    [27, 27, 27, 27, 32],
+    [22, 22, 22, 22, 26],
+  ];
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const DEG = Math.PI / 180;
+  const SPAN = 168 * DEG, PHI0 = 174 * DEG, GAP = 3;
+  const R5 = 620, ROWGAP = 27, SEAT_R = 3.7;
+  const units = SECTORS.reduce((a, s) => a + s[4], 0) + GAP * (SECTORS.length - 1);
+  const STEP = SPAN / units;
+  const KEY = 'gala-draw-v1';
+
+  const $ = id => document.getElementById(id);
+  const svg = $('hall');
+  const el = (tag, attrs, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+  const polar = (r, phi) => [r * Math.cos(phi), -r * Math.sin(phi)];
+
+  // ---------- Build SVG ----------
+  const defs = el('defs', {}, svg);
+  defs.innerHTML = `
+    <radialGradient id="floor" cx="50%" cy="100%" r="100%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".07"/>
+      <stop offset=".8" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="7"/></filter>`;
+  el('path', { d: `M -500 40 A 500 500 0 0 1 500 40 Z`, fill: 'url(#floor)' }, svg);
+  el('path', { class: 'stage-shape', d: 'M -230 52 Q 0 -22 230 52 Z' }, svg);
+  const st = el('text', { class: 'stage-text', x: 6, y: 38, 'text-anchor': 'middle' }, svg);
+  st.textContent = 'СЦЕНА';
+
+  const seats = [];       // flat list
+  const sectorGroups = []; // {g, rows:[{g, seats:[]}]}
+  let phi = PHI0;
+  SECTORS.forEach((rows, s) => {
+    const width = rows[4] * STEP;
+    const phiStart = phi, phiMid = phi - width / 2;
+    const g = el('g', { class: 'sector' }, svg);
+    const info = { g, rows: [] };
+    rows.forEach((n, r) => {
+      const R = R5 - (4 - r) * ROWGAP;
+      const rg = el('g', { class: 'row' }, g);
+      const rowInfo = { g: rg, seats: [] };
+      for (let i = 0; i < n; i++) {
+        const a = phiStart - (i + 0.5) * width / n;
+        const [x, y] = polar(R, a);
+        const c = el('circle', { class: 'seat', cx: x.toFixed(1), cy: y.toFixed(1), r: SEAT_R }, rg);
+        const seat = { s: s + 1, r: r + 1, n: i + 1, x, y, el: c, key: `${s + 1}-${r + 1}-${i + 1}` };
+        c.dataset.i = seats.length;
+        seats.push(seat);
+        rowInfo.seats.push(seat);
+      }
+      info.rows.push(rowInfo);
+    });
+    // sector label
+    const [lx, ly] = polar(R5 + 34, phiMid);
+    const rot = 90 - phiMid / DEG;
+    const lab = el('text', { class: 'sector-label', x: lx, y: ly, 'text-anchor': 'middle', transform: `rotate(${rot} ${lx} ${ly})` }, g);
+    lab.textContent = `СЕКТОР ${s + 1}`;
+    const [cx2, cy2] = polar(R5 + 58, phiMid);
+    const cnt = el('text', { class: 'sector-count', x: cx2, y: cy2, 'text-anchor': 'middle', transform: `rotate(${rot} ${cx2} ${cy2})` }, g);
+    cnt.textContent = `${rows.reduce((a, b) => a + b, 0)} місць`;
+    // row numbers on the outer edges of the hall
+    if (s === 0 || s === SECTORS.length - 1) {
+      rows.forEach((_, r) => {
+        const R = R5 - (4 - r) * ROWGAP;
+        const a = s === 0 ? phiStart + 1.6 * STEP : phiStart - width - 1.6 * STEP;
+        const [x, y] = polar(R, a);
+        const t = el('text', { class: 'row-label', x, y: y + 3.5, 'text-anchor': 'middle' }, info.rows[r].g);
+        t.textContent = r + 1;
+      });
+    }
+    sectorGroups.push(info);
+    phi = phiStart - width - GAP * STEP;
+  });
+
+  const halo = el('g', { id: 'halo', opacity: 0 }, svg);
+  el('circle', { r: 16, fill: '#ffffff', opacity: .35, filter: 'url(#glow)' }, halo);
+  el('circle', { r: SEAT_R + 1.2, fill: '#ffffff' }, halo);
+  const ringLayer = el('g', {}, svg);
+
+  const TOTAL = seats.length;
+  $('hallStats').textContent = `6 секторів · 30 рядів · ${TOTAL} місць`;
+
+  // ---------- State ----------
+  let state = { history: [], excluded: [], noRepeat: true, sound: true };
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) state = Object.assign(state, JSON.parse(raw));
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+  let excluded = new Set(state.excluded);
+  let running = false, editing = false;
+
+  const wonKeys = () => new Set(state.history.map(h => h.key));
+  const pool = () => {
+    const won = state.noRepeat ? wonKeys() : new Set();
+    return seats.filter(x => !excluded.has(x.key) && !won.has(x.key));
+  };
+  const plural = (n, one, few, many) => {
+    const m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  };
+
+  function paintSeats() {
+    const won = wonKeys();
+    seats.forEach(x => {
+      x.el.classList.toggle('won', won.has(x.key));
+      x.el.classList.toggle('excluded', excluded.has(x.key) && !won.has(x.key));
+    });
+  }
+  function updateInfo() {
+    const p = pool().length;
+    $('poolCount').textContent = `${p} ${plural(p, 'місце', 'місця', 'місць')} у грі`;
+    $('drawNo').textContent = `Розіграш № ${state.history.length + 1}`;
+    $('winCount').textContent = state.history.length ? state.history.length : '';
+    if (!running) renderHint();
+  }
+  function renderHint() {
+    const hint = $('hint');
+    if (editing) {
+      hint.innerHTML = `Торкніться місця, щоб виключити його · виключено ${excluded.size}` +
+        (excluded.size ? ` · <button id="clearEx">Повернути всі</button>` : '');
+      const b = $('clearEx');
+      if (b) b.onclick = () => { excluded.clear(); syncExcluded(); };
+    } else {
+      hint.innerHTML = 'або натисніть <kbd>Пробіл</kbd>';
+    }
+  }
+  function syncExcluded() {
+    state.excluded = [...excluded];
+    save(); paintSeats(); updateInfo();
+  }
+  function renderWinners(fresh) {
+    const list = $('winList');
+    list.innerHTML = '';
+    if (!state.history.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = 'Тут з’являться переможці розіграшу';
+      list.appendChild(li);
+      return;
+    }
+    [...state.history].reverse().forEach((h, i) => {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.className = 'win' + (fresh && i === 0 ? ' new' : '');
+      b.innerHTML = `<span class="win-no">${h.no}</span><span class="win-seat">Сектор ${h.s} · Ряд ${h.r} · Місце ${h.n}</span><span class="win-prize"></span>`;
+      b.querySelector('.win-prize').textContent = h.prize || `${h.time}`;
+      b.title = 'Показати місце на схемі';
+      b.onclick = () => {
+        const seat = seats.find(x => x.key === h.key);
+        if (seat) pingSeat(seat, 3600);
+      };
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+  }
+
+  // ---------- Sound ----------
+  let ctx = null;
+  const audio = () => {
+    if (!state.sound) return null;
+    try {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+    } catch (e) { return null; }
+    return ctx;
+  };
+  function tone(freq, dur, type = 'sine', vol = .12, delay = 0) {
+    const a = audio(); if (!a) return;
+    const t = a.currentTime + delay;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination);
+    o.start(t); o.stop(t + dur + .05);
+  }
+  const tick = f => tone(f, .05, 'triangle', .08);
+  const thud = () => { tone(110, .5, 'sine', .25); tone(220, .35, 'triangle', .06); };
+  const chime = () => [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+    tone(f, 2.2, 'sine', .09, i * .09); tone(f * 2, 1.2, 'sine', .02, i * .09);
+  });
+
+  // ---------- Draw sequence ----------
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const SPEED = reduced ? .4 : 1;
+  const sleep = ms => new Promise(r => setTimeout(r, ms * SPEED));
+  const rnd = n => {
+    try { const u = new Uint32Array(1); crypto.getRandomValues(u); return u[0] % n; }
+    catch (e) { return Math.floor(Math.random() * n); }
+  };
+  const reels = { S: $('reelS'), R: $('reelR'), N: $('reelN') };
+  function setReel(k, v) {
+    const val = reels[k].querySelector('.reel-val');
+    val.textContent = v;
+    val.classList.remove('bump'); void val.offsetWidth; val.classList.add('bump');
+  }
+  function resetReels() {
+    Object.values(reels).forEach(r => { r.classList.remove('locked', 'active'); r.querySelector('.reel-val').textContent = '–'; });
+  }
+  async function cycle(count, target, steps, base, max, onStep) {
+    let idx = ((target - steps + 1) % count + count) % count;
+    for (let i = 0; i < steps; i++) {
+      onStep(idx, i === steps - 1);
+      const t = steps > 1 ? i / (steps - 1) : 1;
+      await sleep(base + (max - base) * t * t * t);
+      idx = (idx + 1) % count;
+    }
+  }
+  function moveHalo(seat) {
+    halo.setAttribute('transform', `translate(${seat.x.toFixed(1)} ${seat.y.toFixed(1)})`);
+  }
+  function addRings(seat, n = 3) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const c = el('circle', { class: 'ring', cx: seat.x, cy: seat.y, r: 6 }, ringLayer);
+      c.style.animationDelay = `${i * .8}s`;
+      out.push(c);
+    }
+    return out;
+  }
+  function pingSeat(seat, ms) {
+    const rings = addRings(seat, 2);
+    moveHalo(seat); halo.setAttribute('opacity', 1);
+    setTimeout(() => { rings.forEach(r => r.remove()); if (!running) halo.setAttribute('opacity', 0); }, ms);
+  }
+  function clearMarks() {
+    svg.querySelectorAll('.hl, .locked, .spark, .winner').forEach(n => n.classList.remove('hl', 'locked', 'spark', 'winner'));
+    ringLayer.innerHTML = '';
+    halo.setAttribute('opacity', 0);
+  }
+
+  async function draw() {
+    if (running) return;
+    const p = pool();
+    if (!p.length) { toast('Усі місця вже брали участь. Очистьте список переможців або поверніть місця.'); return; }
+    if (editing) toggleEdit(false);
+    running = true;
+    audio();
+    const winner = p[rnd(p.length)];
+    const prize = $('prize').value.trim();
+    const btn = $('drawBtn');
+    btn.disabled = true; btn.textContent = 'Розіграш триває';
+    $('hint').textContent = 'Обираємо щасливе місце…';
+    clearMarks(); resetReels();
+    svg.classList.add('drawing');
+
+    // 1. shimmer across the whole hall
+    const sparkEnd = performance.now() + 1100 * SPEED;
+    while (performance.now() < sparkEnd) {
+      for (let k = 0; k < 26; k++) {
+        const x = seats[rnd(TOTAL)].el;
+        x.classList.add('spark');
+        setTimeout(() => x.classList.remove('spark'), 90);
+      }
+      tone(1200 + rnd(1200), .03, 'sine', .015);
+      await sleep(45);
+    }
+
+    // 2. sector
+    reels.S.classList.add('active');
+    let prev = null;
+    await cycle(6, winner.s - 1, 24, 45, 430, (i, last) => {
+      if (prev) prev.classList.remove('hl');
+      prev = sectorGroups[i].g; prev.classList.add('hl');
+      setReel('S', i + 1); tick(last ? 660 : 440);
+    });
+    prev.classList.remove('hl');
+    const sec = sectorGroups[winner.s - 1];
+    sec.g.classList.add('locked');
+    reels.S.classList.replace('active', 'locked'); thud();
+    await sleep(650);
+
+    // 3. row
+    reels.R.classList.add('active');
+    prev = null;
+    await cycle(5, winner.r - 1, 15, 60, 460, (i, last) => {
+      if (prev) prev.classList.remove('hl');
+      prev = sec.rows[i].g; prev.classList.add('hl');
+      setReel('R', i + 1); tick(last ? 740 : 520);
+    });
+    prev.classList.remove('hl');
+    const row = sec.rows[winner.r - 1];
+    row.g.classList.add('locked');
+    reels.R.classList.replace('active', 'locked'); thud();
+    await sleep(650);
+
+    // 4. seat — one sweep along the row, slowing to a stop
+    reels.N.classList.add('active');
+    halo.setAttribute('opacity', 1);
+    prev = null;
+    const n = row.seats.length;
+    await cycle(n, winner.n - 1, n + Math.min(n, 8), 28, 560, (i, last) => {
+      if (prev) prev.classList.remove('hl');
+      const seat = row.seats[i];
+      prev = seat.el; prev.classList.add('hl');
+      moveHalo(seat);
+      setReel('N', i + 1); tick(last ? 880 : 600 + i * 6);
+    });
+    prev.classList.remove('hl');
+    winner.el.classList.add('winner');
+    reels.N.classList.replace('active', 'locked');
+    addRings(winner, 3);
+    thud(); chime();
+
+    const rec = { no: state.history.length + 1, s: winner.s, r: winner.r, n: winner.n, key: winner.key, prize,
+      time: new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) };
+    state.history.push(rec); save();
+
+    await sleep(1100);
+    showReveal(rec);
+    renderWinners(true);
+    $('prize').value = '';
+    running = false;
+    btn.disabled = false; btn.textContent = 'Розіграти ще';
+    updateInfo();
+  }
+
+  // ---------- Reveal + confetti ----------
+  const reveal = $('reveal');
+  const canvas = $('confetti');
+  const c2d = canvas.getContext('2d');
+  let parts = [], raf = 0, snowing = false;
+  const GREYS = ['#ffffff', '#f0f0f0', '#d4d4d6', '#b0b0b4', '#8a8a8e', '#5e5e62'];
+  function sizeCanvas() {
+    const d = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = innerWidth * d; canvas.height = innerHeight * d;
+    c2d.setTransform(d, 0, 0, d, 0, 0);
+  }
+  function spawn(x, y, vx, vy) {
+    const glint = Math.random() < .22;
+    parts.push({ x, y, vx, vy, w: glint ? 2 + Math.random() * 2 : 6 + Math.random() * 8, h: 3 + Math.random() * 4,
+      rot: Math.random() * 6.28, vr: (Math.random() - .5) * .3, flip: Math.random() * 6.28, vf: .08 + Math.random() * .12,
+      col: GREYS[rnd(GREYS.length)], glint, life: 0 });
+  }
+  function burst() {
+    const W = innerWidth, H = innerHeight;
+    for (let i = 0; i < 200; i++) {
+      const a = Math.random() * Math.PI * 2, v = 4 + Math.random() * 12;
+      spawn(W / 2, H * .42, Math.cos(a) * v, Math.sin(a) * v - 4);
+    }
+    for (let side of [0, 1]) for (let i = 0; i < 70; i++) {
+      const a = (side ? -115 : -65) * DEG + (Math.random() - .5) * .5, v = 12 + Math.random() * 10;
+      spawn(side ? W : 0, H, Math.cos(a) * v * (side ? 1 : 1), Math.sin(a) * v);
+    }
+  }
+  function frame() {
+    const W = innerWidth, H = innerHeight;
+    c2d.clearRect(0, 0, W, H);
+    if (snowing && Math.random() < .6) spawn(Math.random() * W, -10, (Math.random() - .5) * 1, 1 + Math.random() * 1.5);
+    parts = parts.filter(p => p.y < H + 30 && p.life < 900);
+    for (const p of parts) {
+      p.life++;
+      p.vx *= .985; p.vy = p.vy * .985 + .16;
+      if (p.vy > 3.2) p.vy = 3.2;
+      p.x += p.vx + Math.sin(p.life * .05 + p.flip) * .4; p.y += p.vy;
+      p.rot += p.vr; p.flip += p.vf;
+      c2d.save();
+      c2d.translate(p.x, p.y);
+      if (p.glint) {
+        const s = (Math.sin(p.flip * 2) + 1) / 2;
+        c2d.globalAlpha = .4 + .6 * s;
+        c2d.fillStyle = '#ffffff';
+        c2d.shadowColor = '#ffffff'; c2d.shadowBlur = 8;
+        c2d.beginPath(); c2d.arc(0, 0, p.w * (.6 + s * .6), 0, 6.283); c2d.fill();
+      } else {
+        c2d.rotate(p.rot);
+        c2d.scale(1, Math.cos(p.flip));
+        c2d.fillStyle = p.col;
+        c2d.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      }
+      c2d.restore();
+    }
+    if (parts.length || snowing) raf = requestAnimationFrame(frame); else raf = 0;
+  }
+  function showReveal(rec) {
+    $('revealNo').textContent = `Розіграш № ${rec.no}`;
+    $('revealPrize').textContent = rec.prize || '';
+    $('revealPrize').hidden = !rec.prize;
+    $('rvS').textContent = rec.s; $('rvR').textContent = rec.r; $('rvN').textContent = rec.n;
+    reveal.hidden = false;
+    sizeCanvas();
+    parts = [];
+    if (!reduced) { burst(); snowing = true; if (!raf) raf = requestAnimationFrame(frame); }
+    setTimeout(() => $('revealClose').focus(), 50);
+  }
+  function hideReveal() {
+    if (reveal.hidden) return;
+    reveal.hidden = true; snowing = false; parts = [];
+    cancelAnimationFrame(raf); raf = 0;
+    $('drawBtn').focus();
+  }
+  $('revealClose').onclick = hideReveal;
+  reveal.addEventListener('click', e => { if (e.target === reveal) hideReveal(); });
+  addEventListener('resize', () => { if (!reveal.hidden) sizeCanvas(); });
+
+  // ---------- Controls ----------
+  let toastT = 0;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3600);
+  }
+  function toggleEdit(on) {
+    editing = on;
+    $('editBtn').setAttribute('aria-pressed', on);
+    svg.classList.toggle('editing', on);
+    renderHint();
+  }
+  $('editBtn').onclick = () => { if (!running) toggleEdit(!editing); };
+  $('repeatBtn').onclick = () => {
+    state.noRepeat = !state.noRepeat;
+    $('repeatBtn').setAttribute('aria-pressed', state.noRepeat);
+    save(); updateInfo();
+    toast(state.noRepeat ? 'Місця переможців більше не беруть участі' : 'Місця переможців знову беруть участь');
+  };
+  $('soundBtn').onclick = () => {
+    state.sound = !state.sound;
+    $('soundBtn').setAttribute('aria-pressed', state.sound);
+    save();
+    if (state.sound) tick(660);
+  };
+  $('fsBtn').onclick = toggleFs;
+  function toggleFs() {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen().catch(() => toast('Повноекранний режим недоступний у цьому вікні'));
+    } catch (e) { toast('Повноекранний режим недоступний у цьому вікні'); }
+  }
+  let resetArmed = 0;
+  $('resetBtn').onclick = () => {
+    if (running) return;
+    const b = $('resetBtn');
+    if (!state.history.length) { toast('Список переможців порожній'); return; }
+    if (!resetArmed) {
+      b.classList.add('warn'); b.querySelector('span').textContent = 'Підтвердити';
+      resetArmed = setTimeout(() => { resetArmed = 0; b.classList.remove('warn'); b.querySelector('span').textContent = 'Очистити'; }, 3500);
+      return;
+    }
+    clearTimeout(resetArmed); resetArmed = 0;
+    b.classList.remove('warn'); b.querySelector('span').textContent = 'Очистити';
+    state.history = []; save();
+    clearMarks(); resetReels(); svg.classList.remove('drawing');
+    $('drawBtn').textContent = 'Розіграти';
+    paintSeats(); renderWinners(); updateInfo();
+    toast('Список переможців очищено');
+  };
+  $('drawBtn').onclick = draw;
+
+  // seat hover + edit clicks
+  const tip = $('tip');
+  svg.addEventListener('pointermove', e => {
+    const i = e.target.dataset && e.target.dataset.i;
+    if (i === undefined || e.pointerType === 'touch') { tip.hidden = true; return; }
+    const x = seats[i];
+    tip.textContent = `Сектор ${x.s} · Ряд ${x.r} · Місце ${x.n}` + (excluded.has(x.key) ? ' · вільне' : '');
+    tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px';
+    tip.hidden = false;
+  });
+  svg.addEventListener('pointerleave', () => tip.hidden = true);
+  svg.addEventListener('click', e => {
+    const i = e.target.dataset && e.target.dataset.i;
+    if (!editing || i === undefined) return;
+    const x = seats[i];
+    if (excluded.has(x.key)) excluded.delete(x.key); else excluded.add(x.key);
+    syncExcluded();
+  });
+
+  addEventListener('keydown', e => {
+    const typing = e.target.tagName === 'INPUT';
+    if (e.key === 'Escape') { hideReveal(); if (editing) toggleEdit(false); return; }
+    if (typing) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); draw(); } return; }
+    if (e.code === 'Space' || e.key === 'Enter') {
+      if (e.target.tagName === 'BUTTON') return;
+      e.preventDefault();
+      if (!reveal.hidden) hideReveal(); else draw();
+    }
+    if (e.key === 'f' || e.key === 'F' || e.key === 'а' || e.key === 'А') toggleFs();
+  });
+
+  // ---------- Init ----------
+  $('repeatBtn').setAttribute('aria-pressed', state.noRepeat);
+  $('soundBtn').setAttribute('aria-pressed', state.sound);
+  if (state.history.length) $('drawBtn').textContent = 'Розіграти ще';
+  paintSeats(); renderWinners(); updateInfo();
+  try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {}
+})();
+</script>
+</body>
+</html>
