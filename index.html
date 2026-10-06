@@ -359,6 +359,57 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   background-clip: text;
   color: transparent;
 }
+.count { display: flex; align-items: center; gap: 10px; }
+.count-label { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-right: 6px; }
+.count-btn {
+  width: 40px; height: 40px;
+  background: transparent; border: 1px solid var(--line); color: var(--fg);
+  font-size: 20px; line-height: 1; cursor: pointer;
+  transition: border-color .2s, background .2s, color .2s;
+}
+.count-btn:hover:not(:disabled) { border-color: var(--silver); }
+.count-btn:disabled { color: var(--seat-dim); cursor: default; }
+#count {
+  width: 72px; height: 40px;
+  background: transparent; border: 0; border-bottom: 1px solid var(--line);
+  color: var(--fg); text-align: center;
+  font-family: var(--display); font-size: 30px; font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+  -moz-appearance: textfield; appearance: textfield;
+}
+#count::-webkit-inner-spin-button, #count::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#count:focus { outline: none; border-color: var(--silver); }
+.mini-halo { pointer-events: none; transition: transform .18s ease-out; }
+
+.reveal-grid {
+  width: 100%;
+  max-height: 56vh;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  padding: 2px;
+}
+.rg-card {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,.04), transparent 70%), var(--bg);
+  padding: 12px 10px 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  animation: up .7s both cubic-bezier(.2,.7,.2,1);
+}
+.rg-no { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.rg-nums { display: flex; justify-content: center; width: 100%; }
+.rg-nums > span { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.rg-nums > span + span { border-left: 1px solid var(--line); }
+.rg-nums b {
+  font-family: var(--display); font-weight: 500; line-height: 1;
+  font-size: clamp(34px, 3.6vw, 56px);
+  font-variant-numeric: lining-nums;
+  background: linear-gradient(180deg, #ffffff 0%, #e6e6e6 45%, #9a9a9e 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.rg-nums i { font-style: normal; font-size: 9px; letter-spacing: .22em; text-transform: uppercase; color: var(--seat); font-weight: 600; }
+.reveal-grid.compact .rg-nums b { font-size: clamp(26px, 2.4vw, 38px); }
 .reveal-btn {
   margin-top: 6px;
   background: transparent;
@@ -437,6 +488,12 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       <div class="panel" id="panel">
         <div class="eyebrow"><span id="drawNo">Розіграш № 1</span><i></i><span id="poolCount">718 місць у грі</span></div>
         <input class="prize" id="prize" type="text" maxlength="60" placeholder="Назва призу" autocomplete="off" aria-label="Назва призу">
+        <div class="count" role="group" aria-label="Кількість переможців">
+          <label class="count-label" for="count">Переможців</label>
+          <button class="count-btn" id="countMinus" type="button" aria-label="Менше переможців">−</button>
+          <input id="count" type="number" min="1" max="50" value="1" inputmode="numeric">
+          <button class="count-btn" id="countPlus" type="button" aria-label="Більше переможців">+</button>
+        </div>
         <div class="reels">
           <div class="reel" id="reelS"><span class="reel-label">Сектор</span><span class="reel-val">–</span></div>
           <div class="reel" id="reelR"><span class="reel-label">Ряд</span><span class="reel-val">–</span></div>
@@ -464,11 +521,12 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     <span class="eyebrow" id="revealNo">Розіграш № 1</span>
     <h2 class="reveal-title" id="revealTitle">Вітаємо переможця</h2>
     <div class="reveal-prize" id="revealPrize"></div>
-    <div class="reveal-nums">
+    <div class="reveal-nums" id="revealSingle">
       <div class="rv"><span class="rv-label">Сектор</span><span class="rv-num" id="rvS">1</span></div>
       <div class="rv"><span class="rv-label">Ряд</span><span class="rv-num" id="rvR">1</span></div>
       <div class="rv"><span class="rv-label">Місце</span><span class="rv-num" id="rvN">1</span></div>
     </div>
+    <div class="reveal-grid" id="revealGrid" hidden></div>
     <button class="reveal-btn" id="revealClose">Продовжити</button>
   </div>
 </div>
@@ -564,12 +622,14 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   el('circle', { r: 16, fill: '#ffffff', opacity: .35, filter: 'url(#glow)' }, halo);
   el('circle', { r: SEAT_R + 1.2, fill: '#ffffff' }, halo);
   const ringLayer = el('g', {}, svg);
+  const haloLayer = el('g', {}, svg);
 
   const TOTAL = seats.length;
   $('hallStats').textContent = `6 секторів · 30 рядів · ${TOTAL} місць`;
 
   // ---------- State ----------
-  let state = { history: [], excluded: [], noRepeat: true, sound: true };
+  let state = { history: [], excluded: [], noRepeat: true, sound: true, count: 1 };
+  const MAX_COUNT = 50;
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) state = Object.assign(state, JSON.parse(raw));
@@ -578,6 +638,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   let excluded = new Set(state.excluded);
   let running = false, editing = false;
 
+  const nextDraw = () => state.history.reduce((m, h) => Math.max(m, h.draw || h.no), 0) + 1;
   const wonKeys = () => new Set(state.history.map(h => h.key));
   const pool = () => {
     const won = state.noRepeat ? wonKeys() : new Set();
@@ -600,7 +661,8 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   function updateInfo() {
     const p = pool().length;
     $('poolCount').textContent = `${p} ${plural(p, 'місце', 'місця', 'місць')} у грі`;
-    $('drawNo').textContent = `Розіграш № ${state.history.length + 1}`;
+    $('drawNo').textContent = `Розіграш № ${nextDraw()}`;
+    syncCount();
     $('winCount').textContent = state.history.length ? state.history.length : '';
     if (!running) renderHint();
   }
@@ -632,7 +694,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     [...state.history].reverse().forEach((h, i) => {
       const li = document.createElement('li');
       const b = document.createElement('button');
-      b.className = 'win' + (fresh && i === 0 ? ' new' : '');
+      b.className = 'win' + (i < fresh ? ' new' : '');
       b.innerHTML = `<span class="win-no">${h.no}</span><span class="win-seat">Сектор ${h.s} · Ряд ${h.r} · Місце ${h.n}</span><span class="win-prize"></span>`;
       b.querySelector('.win-prize').textContent = h.prize || `${h.time}`;
       b.title = 'Показати місце на схемі';
@@ -718,27 +780,30 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   function clearMarks() {
     svg.querySelectorAll('.hl, .locked, .spark, .winner').forEach(n => n.classList.remove('hl', 'locked', 'spark', 'winner'));
     ringLayer.innerHTML = '';
+    haloLayer.innerHTML = '';
     halo.setAttribute('opacity', 0);
   }
 
-  async function draw() {
-    if (running) return;
-    const p = pool();
-    if (!p.length) { toast('Усі місця вже брали участь. Очистьте список переможців або поверніть місця.'); return; }
-    if (editing) toggleEdit(false);
-    running = true;
-    audio();
-    const winner = p[rnd(p.length)];
-    const prize = $('prize').value.trim();
-    const btn = $('drawBtn');
-    btn.disabled = true; btn.textContent = 'Розіграш триває';
-    $('hint').textContent = 'Обираємо щасливе місце…';
-    clearMarks(); resetReels();
-    svg.classList.add('drawing');
+  // ---------- Number of winners ----------
+  function maxCount() { return Math.max(1, Math.min(MAX_COUNT, pool().length)); }
+  function syncCount() {
+    const max = maxCount();
+    const v = Math.min(Math.max(1, parseInt(state.count, 10) || 1), max);
+    state.count = v;
+    $('count').value = v; $('count').max = max;
+    $('countMinus').disabled = running || v <= 1;
+    $('countPlus').disabled = running || v >= max;
+    $('count').disabled = running;
+  }
+  function setCount(v) { state.count = v; syncCount(); save(); }
+  $('countMinus').onclick = () => setCount(state.count - 1);
+  $('countPlus').onclick = () => setCount(state.count + 1);
+  $('count').addEventListener('change', e => setCount(parseInt(e.target.value, 10) || 1));
+  $('count').addEventListener('input', e => { const v = parseInt(e.target.value, 10); if (v >= 1) { state.count = Math.min(v, maxCount()); save(); } });
 
-    // 1. shimmer across the whole hall
-    const sparkEnd = performance.now() + 1100 * SPEED;
-    while (performance.now() < sparkEnd) {
+  async function shimmer(ms) {
+    const end = performance.now() + ms * SPEED;
+    while (performance.now() < end) {
       for (let k = 0; k < 26; k++) {
         const x = seats[rnd(TOTAL)].el;
         x.classList.add('spark');
@@ -747,6 +812,35 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       tone(1200 + rnd(1200), .03, 'sine', .015);
       await sleep(45);
     }
+  }
+  const stamp = () => new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+
+  async function draw() {
+    if (running) return;
+    const p = pool();
+    if (!p.length) { toast('Усі місця вже брали участь. Очистьте список переможців або поверніть місця.'); return; }
+    if (editing) toggleEdit(false);
+    running = true;
+    audio();
+    const k = Math.min(Math.max(1, parseInt($('count').value, 10) || 1), p.length, MAX_COUNT);
+    if (k < state.count) toast(`У грі лише ${p.length} ${plural(p.length, 'місце', 'місця', 'місць')}`);
+    // pick k distinct seats up front (partial Fisher–Yates); the animation only reveals them
+    const bag = p.slice();
+    for (let i = 0; i < k; i++) { const j = i + rnd(bag.length - i); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    const picked = bag.slice(0, k);
+    const prize = $('prize').value.trim();
+    const draw = nextDraw();
+    const btn = $('drawBtn');
+    btn.disabled = true; btn.textContent = 'Розіграш триває';
+    $('hint').textContent = k > 1 ? `Обираємо ${k} щасливих місць…` : 'Обираємо щасливе місце…';
+    clearMarks(); resetReels();
+    svg.classList.add('drawing');
+    syncCount();
+
+    // 1. shimmer across the whole hall
+    await shimmer(1100);
+    if (k > 1) return drawMany(picked, p, prize, draw);
+    const winner = picked[0];
 
     // 2. sector
     reels.S.classList.add('active');
@@ -794,15 +888,73 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     addRings(winner, 3);
     thud(); chime();
 
-    const rec = { no: state.history.length + 1, s: winner.s, r: winner.r, n: winner.n, key: winner.key, prize,
-      time: new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) };
+    const rec = { no: state.history.length + 1, draw, s: winner.s, r: winner.r, n: winner.n, key: winner.key, prize, time: stamp() };
     state.history.push(rec); save();
 
     await sleep(1100);
-    showReveal(rec);
-    renderWinners(true);
+    finish([rec]);
+  }
+
+  // Several winners at once: one light per winner roams the hall, then they settle one after another.
+  async function drawMany(picked, p, prize, draw) {
+    const k = picked.length;
+    const ringsEach = k > 12 ? 1 : 2;
+    const lights = picked.map(w => {
+      const g = el('g', { class: 'mini-halo' }, haloLayer);
+      el('circle', { r: 13, fill: '#ffffff', opacity: .3, filter: 'url(#glow)' }, g);
+      el('circle', { r: SEAT_R + 1, fill: '#ffffff' }, g);
+      return { g, w, done: false };
+    });
+    const place = (l, seat) => { l.g.style.transform = `translate(${seat.x}px, ${seat.y}px)`; };
+    lights.forEach(l => place(l, p[rnd(p.length)]));
+    Object.values(reels).forEach(r => r.classList.add('active'));
+
+    const steps = Math.min(20 + 2 * k, 60);
+    const firstLock = Math.floor(steps * .45);
+    const lockAt = picked.map((_, i) => firstLock + Math.round((steps - 1 - firstLock) * (i + 1) / k));
+    let lit = [];
+    for (let step = 0; step < steps; step++) {
+      lit.forEach(e => e.classList.remove('hl')); lit = [];
+      lights.forEach((l, i) => {
+        if (l.done) return;
+        if (lockAt[i] === step) {
+          l.done = true;
+          place(l, l.w);
+          l.w.el.classList.add('winner');
+          addRings(l.w, ringsEach);
+          setReel('S', l.w.s); setReel('R', l.w.r); setReel('N', l.w.n);
+          Object.values(reels).forEach(r => { r.classList.remove('locked'); void r.offsetWidth; r.classList.add('locked'); });
+          tone(110, .4, 'sine', .18); tone(880 + i * 30, .25, 'sine', .05);
+          $('hint').textContent = `Обрано ${i + 1} з ${k}`;
+        } else {
+          const seat = p[rnd(p.length)];
+          place(l, seat); seat.el.classList.add('hl'); lit.push(seat.el);
+        }
+      });
+      if (lights.some(l => !l.done)) tick(480 + rnd(200));
+      const t = step / (steps - 1);
+      await sleep(70 + 330 * t * t);
+    }
+    lit.forEach(e => e.classList.remove('hl'));
+    thud(); chime();
+
+    const time = stamp();
+    const recs = picked.map(w => {
+      const rec = { no: state.history.length + 1, draw, s: w.s, r: w.r, n: w.n, key: w.key, prize, time };
+      state.history.push(rec);
+      return rec;
+    });
+    save();
+    await sleep(1200);
+    finish(recs);
+  }
+
+  function finish(recs) {
+    showReveal(recs);
+    renderWinners(recs.length);
     $('prize').value = '';
     running = false;
+    const btn = $('drawBtn');
     btn.disabled = false; btn.textContent = 'Розіграти ще';
     updateInfo();
   }
@@ -864,10 +1016,25 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     }
     if (parts.length || snowing) raf = requestAnimationFrame(frame); else raf = 0;
   }
-  function showReveal(rec) {
-    $('revealNo').textContent = `Розіграш № ${rec.no}`;
+  function showReveal(recs) {
+    const rec = recs[0], many = recs.length > 1;
+    $('revealNo').textContent = `Розіграш № ${rec.draw || rec.no}` + (many ? ` · ${recs.length} ${plural(recs.length, 'переможець', 'переможці', 'переможців')}` : '');
+    $('revealTitle').textContent = many ? 'Вітаємо переможців' : 'Вітаємо переможця';
     $('revealPrize').textContent = rec.prize || '';
     $('revealPrize').hidden = !rec.prize;
+    $('revealSingle').hidden = many;
+    const grid = $('revealGrid');
+    grid.hidden = !many;
+    grid.classList.toggle('compact', recs.length > 8);
+    grid.innerHTML = '';
+    if (many) recs.forEach((r, i) => {
+      const c = document.createElement('div');
+      c.className = 'rg-card';
+      c.style.animationDelay = `${.35 + Math.min(i, 24) * .07}s`;
+      c.innerHTML = `<span class="rg-no">Переможець ${i + 1}</span><div class="rg-nums">
+        <span><b>${r.s}</b><i>сектор</i></span><span><b>${r.r}</b><i>ряд</i></span><span><b>${r.n}</b><i>місце</i></span></div>`;
+      grid.appendChild(c);
+    });
     $('rvS').textContent = rec.s; $('rvR').textContent = rec.r; $('rvN').textContent = rec.n;
     reveal.hidden = false;
     sizeCanvas();
