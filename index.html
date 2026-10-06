@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: an amphitheatre hall map (6 sectors in an arc around the stage) with the draw console set into the hollow of the arc; winners strip beneath. */
+/* Layout: the hall map (sectors 3-2-1 on the left, 4-5-6 on the right, tatami in the centre) beside the draw console and winners list; stacks on phones. */
 :root {
   --bg: #0a0a0b;
   --bg-2: #131315;
@@ -100,13 +100,24 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
 .tool svg { width: 14px; height: 14px; flex: none; }
 
 /* ---------- Hall ---------- */
-.hall-wrap { flex: 1; display: flex; justify-content: center; align-items: center; min-height: 0; }
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 56px);
+  align-items: center;
+  min-height: 0;
+}
 .stage {
   position: relative;
-  width: min(100%, calc((100dvh - 250px) * 1.79), 1500px);
-  min-width: min(100%, 320px);
-  container-type: inline-size;
-  container-name: hall;
+  width: min(calc((100dvh - 150px) * .86), 56vw);
+  min-width: 300px;
+  justify-self: center;
+}
+.side { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .stage { width: min(100%, 640px); min-width: 0; }
 }
 #hall { display: block; width: 100%; height: auto; overflow: visible; user-select: none; }
 
@@ -114,8 +125,12 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
 .sector-label { fill: var(--muted); font-family: var(--body); font-size: 15px; font-weight: 600; letter-spacing: .3em; transition: fill .3s; }
 .sector-count { fill: var(--seat); font-family: var(--display); font-size: 17px; font-style: italic; letter-spacing: .04em; }
 .row-label { fill: var(--seat); font-family: var(--body); font-size: 10px; font-weight: 600; transition: fill .3s; }
-.stage-shape { fill: var(--bg-2); stroke: var(--line); }
-.stage-text { fill: var(--muted); font-family: var(--body); font-size: 13px; letter-spacing: .6em; font-weight: 600; }
+.mat-safety { fill: var(--bg-2); stroke: var(--line); }
+.mat-zone { fill: #1d1d20; }
+.mat-contest { fill: #17171a; stroke: #3a3a3f; stroke-width: 1; }
+.mat-tape { stroke: var(--muted); stroke-width: 3; }
+.mat-text { fill: var(--muted); font-family: var(--body); font-size: 15px; letter-spacing: .7em; font-weight: 600; }
+.mat-sub { fill: var(--seat); font-family: var(--display); font-size: 18px; font-style: italic; }
 
 .seat.won { fill: none !important; stroke: var(--silver); stroke-width: 1.4; }
 .seat.excluded { fill: none !important; stroke: var(--seat-dim); stroke-width: 1.2; }
@@ -148,56 +163,52 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
   to { transform: scale(6); opacity: 0; }
 }
 
-/* ---------- Console in the hollow ---------- */
+/* ---------- Draw console ---------- */
 .panel {
-  position: absolute;
-  left: 21%;
-  width: 58%;
-  top: 30%;
-  height: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 2.1cqw;
+  gap: clamp(16px, 2.6vh, 28px);
   text-align: center;
 }
-.panel .eyebrow { font-size: max(10px, .85cqw); display: flex; gap: 1em; align-items: center; justify-content: center; flex-wrap: wrap; }
+.panel .eyebrow { font-size: 11px; display: flex; gap: 1em; align-items: center; justify-content: center; flex-wrap: wrap; }
 .panel .eyebrow i { width: 4px; height: 4px; background: var(--seat); border-radius: 50%; display: inline-block; }
 .prize {
-  width: min(100%, 34cqw);
+  width: min(100%, 440px);
   background: transparent;
   border: 0;
   border-bottom: 1px solid var(--line);
   color: var(--fg);
   font-family: var(--display);
   font-style: italic;
-  font-size: max(18px, 2.1cqw);
+  font-size: clamp(20px, 1.9vw, 30px);
   text-align: center;
   padding: .2em .4em .3em;
   transition: border-color .2s;
 }
 .prize::placeholder { color: var(--seat); }
 .prize:focus { outline: none; border-color: var(--silver); }
-.reels { display: flex; gap: 1.6cqw; justify-content: center; }
+.reels { display: flex; gap: clamp(8px, 1.2vw, 18px); justify-content: center; width: 100%; }
 .reel {
-  width: 13.5cqw;
+  flex: 1;
+  max-width: 190px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: .5cqw;
-  padding: 1.1cqw .6cqw 1cqw;
+  gap: 8px;
+  padding: clamp(10px, 1.6vh, 18px) 6px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 60%), var(--bg);
   position: relative;
   overflow: hidden;
   transition: border-color .4s, box-shadow .4s;
 }
-.reel-label { font-size: max(9px, .78cqw); letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .3em; }
+.reel-label { font-size: clamp(9px, .8vw, 12px); letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .3em; }
 .reel-val {
   font-family: var(--display);
   font-weight: 500;
-  font-size: 6.4cqw;
+  font-size: clamp(48px, 6.4vw, 120px);
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--seat);
@@ -225,9 +236,9 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
   background: var(--fg);
   color: var(--bg);
   border: 0;
-  padding: 1.05cqw 3.4cqw;
+  padding: 18px 48px;
   min-height: 44px;
-  font-size: max(12px, 1cqw);
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: .34em;
   text-transform: uppercase;
@@ -247,32 +258,18 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
 .draw-btn:active { transform: scale(.98); }
 .draw-btn:disabled { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); cursor: default; }
 .draw-btn:disabled::after { display: none; }
-.hint { font-size: max(10px, .8cqw); color: var(--seat); letter-spacing: .08em; min-height: 1.4em; }
+.hint { font-size: 12px; color: var(--seat); letter-spacing: .08em; min-height: 1.4em; }
 .hint button { background: none; border: 0; padding: 0; color: var(--silver); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px; color: var(--muted); font-size: .95em; }
-
-@container hall (max-width: 760px) {
-  .panel { position: static; width: 100%; height: auto; gap: 16px; padding-top: 18px; }
-  .prize { width: min(100%, 320px); font-size: 20px; }
-  .reels { gap: 10px; width: 100%; }
-  .reel { width: auto; flex: 1; max-width: 120px; padding: 10px 4px; gap: 6px; }
-  .reel-val { font-size: 46px; }
-  .reel-label { font-size: 9px; letter-spacing: .2em; }
-  .draw-btn { padding: 14px 34px; font-size: 12px; }
-  .hint { font-size: 11px; }
-  .panel .eyebrow { font-size: 10px; }
-}
 
 /* ---------- Winners ---------- */
 .winners { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .winners-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
 .winners-head h2 { margin: 0; font-family: var(--display); font-weight: 500; font-size: 22px; }
 .winners-head h2 em { color: var(--muted); font-size: 18px; margin-left: .3em; }
-#winList { list-style: none; margin: 0; padding: 0 0 4px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: thin; }
+#winList { list-style: none; margin: 0; padding: 0 4px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 26vh; overflow-y: auto; scrollbar-width: thin; }
 .win {
-  flex: none;
-  min-width: 190px;
-  max-width: 260px;
+  width: 100%;
   border: 1px solid var(--line);
   padding: 10px 14px;
   display: grid;
@@ -432,9 +429,11 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     </div>
   </header>
 
-  <main class="hall-wrap">
+  <main class="layout">
     <div class="stage" id="stage">
-      <svg id="hall" viewBox="-680 -700 1360 770" role="img" aria-label="Схема залу: 6 секторів, по 5 рядів"></svg>
+      <svg id="hall" viewBox="-485 -565 970 1130" role="img" aria-label="Схема залу: татамі в центрі, сектори 1–3 ліворуч, 4–6 праворуч"></svg>
+    </div>
+    <div class="side">
       <div class="panel" id="panel">
         <div class="eyebrow"><span id="drawNo">Розіграш № 1</span><i></i><span id="poolCount">718 місць у грі</span></div>
         <input class="prize" id="prize" type="text" maxlength="60" placeholder="Назва призу" autocomplete="off" aria-label="Назва призу">
@@ -446,16 +445,16 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
         <button class="draw-btn" id="drawBtn">Розіграти</button>
         <div class="hint" id="hint">або натисніть <kbd>Пробіл</kbd></div>
       </div>
+
+      <section class="winners" aria-label="Переможці">
+        <div class="winners-head">
+          <h2>Переможці <em id="winCount"></em></h2>
+          <span class="eyebrow" id="hallStats">6 секторів · 30 рядів · 718 місць</span>
+        </div>
+        <ol id="winList"></ol>
+      </section>
     </div>
   </main>
-
-  <section class="winners" aria-label="Переможці">
-    <div class="winners-head">
-      <h2>Переможці <em id="winCount"></em></h2>
-      <span class="eyebrow" id="hallStats">6 секторів · 30 рядів · 718 місць</span>
-    </div>
-    <ol id="winList"></ol>
-  </section>
 </div>
 
 <div class="reveal" id="reveal" hidden>
@@ -490,10 +489,9 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 
   const NS = 'http://www.w3.org/2000/svg';
   const DEG = Math.PI / 180;
-  const SPAN = 168 * DEG, PHI0 = 174 * DEG, GAP = 3;
-  const R5 = 620, ROWGAP = 27, SEAT_R = 3.7;
-  const units = SECTORS.reduce((a, s) => a + s[4], 0) + GAP * (SECTORS.length - 1);
-  const STEP = SPAN / units;
+  // Sectors stand in two columns facing the tatami; row 1 is nearest the mat, seat 1 at the top of each row.
+  const COLUMNS = [{ side: -1, order: [2, 1, 0] }, { side: 1, order: [3, 4, 5] }];
+  const ROW1_X = 272, ROWGAP = 30, SEAT_GAP = 11, SECTOR_GAP = 60, SEAT_R = 3.7;
   const KEY = 'gala-draw-v1';
 
   const $ = id => document.getElementById(id);
@@ -504,65 +502,63 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     if (parent) parent.appendChild(n);
     return n;
   };
-  const polar = (r, phi) => [r * Math.cos(phi), -r * Math.sin(phi)];
 
   // ---------- Build SVG ----------
   const defs = el('defs', {}, svg);
   defs.innerHTML = `
-    <radialGradient id="floor" cx="50%" cy="100%" r="100%">
-      <stop offset="0" stop-color="#ffffff" stop-opacity=".07"/>
-      <stop offset=".8" stop-color="#ffffff" stop-opacity="0"/>
+    <radialGradient id="floor" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
     <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="7"/></filter>`;
-  el('path', { d: `M -500 40 A 500 500 0 0 1 500 40 Z`, fill: 'url(#floor)' }, svg);
-  el('path', { class: 'stage-shape', d: 'M -230 52 Q 0 -22 230 52 Z' }, svg);
-  const st = el('text', { class: 'stage-text', x: 6, y: 38, 'text-anchor': 'middle' }, svg);
-  st.textContent = 'СЦЕНА';
+  el('circle', { r: 420, fill: 'url(#floor)' }, svg);
+  // tatami: safety area, warning band, contest area, start tapes
+  el('rect', { class: 'mat-safety', x: -212, y: -212, width: 424, height: 424 }, svg);
+  el('rect', { class: 'mat-zone', x: -176, y: -176, width: 352, height: 352 }, svg);
+  el('rect', { class: 'mat-contest', x: -156, y: -156, width: 312, height: 312 }, svg);
+  el('line', { class: 'mat-tape', x1: -46, y1: -12, x2: -46, y2: 12 }, svg);
+  el('line', { class: 'mat-tape', x1: 46, y1: -12, x2: 46, y2: 12 }, svg);
+  el('text', { class: 'mat-text', x: 5, y: -52, 'text-anchor': 'middle' }, svg).textContent = 'ТАТАМІ';
+  el('text', { class: 'mat-sub', x: 0, y: 72, 'text-anchor': 'middle' }, svg).textContent = 'гала-вечір';
 
-  const seats = [];       // flat list
-  const sectorGroups = []; // {g, rows:[{g, seats:[]}]}
-  let phi = PHI0;
-  SECTORS.forEach((rows, s) => {
-    const width = rows[4] * STEP;
-    const phiStart = phi, phiMid = phi - width / 2;
-    const g = el('g', { class: 'sector' }, svg);
-    const info = { g, rows: [] };
-    rows.forEach((n, r) => {
-      const R = R5 - (4 - r) * ROWGAP;
-      const rg = el('g', { class: 'row' }, g);
-      const rowInfo = { g: rg, seats: [] };
-      for (let i = 0; i < n; i++) {
-        const a = phiStart - (i + 0.5) * width / n;
-        const [x, y] = polar(R, a);
-        const c = el('circle', { class: 'seat', cx: x.toFixed(1), cy: y.toFixed(1), r: SEAT_R }, rg);
-        const seat = { s: s + 1, r: r + 1, n: i + 1, x, y, el: c, key: `${s + 1}-${r + 1}-${i + 1}` };
-        c.dataset.i = seats.length;
-        seats.push(seat);
-        rowInfo.seats.push(seat);
-      }
-      info.rows.push(rowInfo);
-    });
-    // sector label
-    const [lx, ly] = polar(R5 + 34, phiMid);
-    const rot = 90 - phiMid / DEG;
-    const lab = el('text', { class: 'sector-label', x: lx, y: ly, 'text-anchor': 'middle', transform: `rotate(${rot} ${lx} ${ly})` }, g);
-    lab.textContent = `СЕКТОР ${s + 1}`;
-    const [cx2, cy2] = polar(R5 + 58, phiMid);
-    const cnt = el('text', { class: 'sector-count', x: cx2, y: cy2, 'text-anchor': 'middle', transform: `rotate(${rot} ${cx2} ${cy2})` }, g);
-    cnt.textContent = `${rows.reduce((a, b) => a + b, 0)} місць`;
-    // row numbers on the outer edges of the hall
-    if (s === 0 || s === SECTORS.length - 1) {
-      rows.forEach((_, r) => {
-        const R = R5 - (4 - r) * ROWGAP;
-        const a = s === 0 ? phiStart + 1.6 * STEP : phiStart - width - 1.6 * STEP;
-        const [x, y] = polar(R, a);
-        const t = el('text', { class: 'row-label', x, y: y + 3.5, 'text-anchor': 'middle' }, info.rows[r].g);
+  const seats = [];        // flat list
+  const sectorGroups = []; // index = sector - 1: {g, rows:[{g, seats:[]}]}
+  COLUMNS.forEach(({ side, order }) => {
+    const height = order.reduce((a, s) => a + SECTORS[s][4] * SEAT_GAP, 0) + SECTOR_GAP * (order.length - 1);
+    let top = -height / 2;
+    order.forEach(s => {
+      const rows = SECTORS[s];
+      const h = rows[4] * SEAT_GAP, cy = top + h / 2;
+      const g = el('g', { class: 'sector' }, svg);
+      const info = { g, rows: [] };
+      rows.forEach((n, r) => {
+        const x = side * (ROW1_X + r * ROWGAP);
+        const rg = el('g', { class: 'row' }, g);
+        const rowInfo = { g: rg, seats: [] };
+        for (let i = 0; i < n; i++) {
+          const y = cy + (i - (n - 1) / 2) * SEAT_GAP;
+          const c = el('circle', { class: 'seat', cx: x, cy: y.toFixed(1), r: SEAT_R }, rg);
+          const seat = { s: s + 1, r: r + 1, n: i + 1, x, y, el: c, key: `${s + 1}-${r + 1}-${i + 1}` };
+          c.dataset.i = seats.length;
+          seats.push(seat);
+          rowInfo.seats.push(seat);
+        }
+        const t = el('text', { class: 'row-label', x, y: cy - (n - 1) / 2 * SEAT_GAP - 13, 'text-anchor': 'middle' }, rg);
         t.textContent = r + 1;
+        info.rows.push(rowInfo);
       });
-    }
-    sectorGroups.push(info);
-    phi = phiStart - width - GAP * STEP;
+      // sector label along the outer edge
+      const lx = side * (ROW1_X + 4 * ROWGAP + 40), cx2 = side * (ROW1_X + 4 * ROWGAP + 66);
+      const rot = side * 90;
+      el('text', { class: 'sector-label', x: lx, y: cy, 'text-anchor': 'middle', transform: `rotate(${rot} ${lx} ${cy})` }, g)
+        .textContent = `СЕКТОР ${s + 1}`;
+      el('text', { class: 'sector-count', x: cx2, y: cy, 'text-anchor': 'middle', transform: `rotate(${rot} ${cx2} ${cy})` }, g)
+        .textContent = `${rows.reduce((a, b) => a + b, 0)} місць`;
+      sectorGroups[s] = info;
+      top += h + SECTOR_GAP;
+    });
   });
+  seats.sort((a, b) => a.s - b.s || a.r - b.r || a.n - b.n).forEach((x, i) => x.el.dataset.i = i);
 
   const halo = el('g', { id: 'halo', opacity: 0 }, svg);
   el('circle', { r: 16, fill: '#ffffff', opacity: .35, filter: 'url(#glow)' }, halo);
