@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: the hall map (sectors 3-2-1 on the left, 4-5-6 on the right, tatami in the centre) beside the draw console and winners list; stacks on phones. */
+/* Layout: the hall fills the whole screen (sectors 3-2-1 left, 4-5-6 right); the draw console sits on the tatami in the centre; settings open in a menu over the tatami. */
 :root {
   --bg: #0a0a0b;
   --bg-2: #131315;
@@ -41,26 +41,10 @@ body {
 button { font: inherit; color: inherit; }
 button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); outline-offset: 3px; }
 
-.app {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-inline: clamp(16px, 3vw, 40px);
-  padding-block: 18px 22px;
-}
+.app { position: fixed; inset: 0; }
+.stage { position: absolute; inset: 0; }
+#hall { display: block; width: 100%; height: 100%; user-select: none; }
 
-/* ---------- Header ---------- */
-.top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px 24px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 14px;
-}
-.brand { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .eyebrow {
   font-size: 11px;
   letter-spacing: .28em;
@@ -68,56 +52,36 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
   color: var(--muted);
   font-weight: 500;
 }
-.brand h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-weight: 500;
-  font-size: clamp(30px, 3.4vw, 46px);
-  line-height: 1;
-  letter-spacing: .01em;
-  text-wrap: balance;
-}
-.brand h1 em { font-style: italic; color: var(--silver); font-weight: 400; }
-.tools { display: flex; flex-wrap: wrap; gap: 6px; }
 .tool {
-  background: transparent;
+  background: rgba(10,10,11,.6);
   border: 1px solid var(--line);
   color: var(--muted);
-  padding: 8px 12px;
+  padding: 9px 13px;
   font-size: 11px;
-  letter-spacing: .14em;
+  letter-spacing: .16em;
   text-transform: uppercase;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: color .2s, border-color .2s, background .2s;
+  transition: color .2s, border-color .2s, background .2s, opacity .3s;
 }
 .tool:hover { color: var(--fg); border-color: var(--seat); }
-.tool[aria-pressed="true"] { color: var(--bg); background: var(--silver); border-color: var(--silver); }
 .tool.warn { color: var(--fg); border-color: var(--fg); }
-.tool svg { width: 14px; height: 14px; flex: none; }
+.tool svg { width: 15px; height: 15px; flex: none; }
+.corner {
+  position: fixed; z-index: 30;
+  top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px;
+  display: flex; gap: 6px;
+}
+body.running .corner { opacity: .15; pointer-events: none; }
 
-/* ---------- Hall ---------- */
-.layout {
-  flex: 1;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: clamp(20px, 3vw, 56px);
-  align-items: center;
-  min-height: 0;
-}
-.stage {
-  position: relative;
-  width: min(calc((100dvh - 150px) * .86), 56vw);
-  min-width: 300px;
-  justify-self: center;
-}
-.side { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
-@media (max-width: 900px) {
-  .layout { grid-template-columns: minmax(0, 1fr); }
-  .stage { width: min(100%, 640px); min-width: 0; }
+/* phones and portrait screens: hall on top, console below, page scrolls */
+@media (max-aspect-ratio: 1/1) {
+  .app { position: static; padding-block: 64px 24px; padding-inline: 16px; }
+  .stage { position: static; }
+  #hall { height: auto; }
 }
 #hall { display: block; width: 100%; height: auto; overflow: visible; user-select: none; }
 
@@ -128,9 +92,6 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
 .mat-safety { fill: var(--bg-2); stroke: var(--line); }
 .mat-zone { fill: #1d1d20; }
 .mat-contest { fill: #17171a; stroke: #3a3a3f; stroke-width: 1; }
-.mat-tape { stroke: var(--muted); stroke-width: 3; }
-.mat-text { fill: var(--muted); font-family: var(--body); font-size: 15px; letter-spacing: .7em; font-weight: 600; }
-.mat-sub { fill: var(--seat); font-family: var(--display); font-size: 18px; font-style: italic; }
 
 .seat.won { fill: none !important; stroke: var(--silver); stroke-width: 1.4; }
 .seat.excluded { fill: none !important; stroke: var(--seat-dim); stroke-width: 1.2; }
@@ -163,16 +124,38 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
   to { transform: scale(6); opacity: 0; }
 }
 
-/* ---------- Draw console ---------- */
-.panel {
+/* ---------- Draw console (sized from --t, the tatami contest area in px) ---------- */
+.console {
+  --t: 420px;
+  position: absolute;
+  left: 50%; top: 50%;
+  width: var(--t); height: var(--t);
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(16px, 2.6vh, 28px);
+  justify-content: center;
+  gap: calc(var(--t) * .04);
   text-align: center;
+  padding: calc(var(--t) * .05);
 }
-.panel .eyebrow { font-size: 11px; display: flex; gap: 1em; align-items: center; justify-content: center; flex-wrap: wrap; }
-.panel .eyebrow i { width: 4px; height: 4px; background: var(--seat); border-radius: 50%; display: inline-block; }
+.console .eyebrow { font-size: max(10px, calc(var(--t) * .019)); display: flex; gap: 1em; align-items: center; justify-content: center; flex-wrap: wrap; }
+.console .eyebrow i { width: 4px; height: 4px; background: var(--seat); border-radius: 50%; display: inline-block; }
+.c-title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-style: italic;
+  font-size: max(24px, calc(var(--t) * .075));
+  line-height: 1.05;
+  text-wrap: balance;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.c-title.placeholder { color: var(--silver); }
+@media (max-aspect-ratio: 1/1) {
+  .console { position: static; transform: none; height: auto; margin: 8px auto 0; width: min(100%, 520px); --t: min(calc(100vw - 32px), 520px); padding-inline: 0; }
+}
 .prize {
   width: min(100%, 440px);
   background: transparent;
@@ -188,27 +171,26 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
 }
 .prize::placeholder { color: var(--seat); }
 .prize:focus { outline: none; border-color: var(--silver); }
-.reels { display: flex; gap: clamp(8px, 1.2vw, 18px); justify-content: center; width: 100%; }
+.reels { display: flex; gap: calc(var(--t) * .03); justify-content: center; width: 100%; }
 .reel {
   flex: 1;
-  max-width: 190px;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: clamp(10px, 1.6vh, 18px) 6px;
+  gap: calc(var(--t) * .015);
+  padding: calc(var(--t) * .03) 4px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 60%), var(--bg);
   position: relative;
   overflow: hidden;
   transition: border-color .4s, box-shadow .4s;
 }
-.reel-label { font-size: clamp(9px, .8vw, 12px); letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .3em; }
+.reel-label { font-size: max(9px, calc(var(--t) * .02)); letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .3em; }
 .reel-val {
   font-family: var(--display);
   font-weight: 500;
-  font-size: clamp(48px, 6.4vw, 120px);
+  font-size: calc(var(--t) * .16);
   line-height: 1;
   font-variant-numeric: lining-nums tabular-nums;
   color: var(--seat);
@@ -236,9 +218,9 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
   background: var(--fg);
   color: var(--bg);
   border: 0;
-  padding: 18px 48px;
+  padding: calc(var(--t) * .032) calc(var(--t) * .09);
   min-height: 44px;
-  font-size: 13px;
+  font-size: max(12px, calc(var(--t) * .024));
   font-weight: 700;
   letter-spacing: .34em;
   text-transform: uppercase;
@@ -258,16 +240,16 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
 .draw-btn:active { transform: scale(.98); }
 .draw-btn:disabled { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); cursor: default; }
 .draw-btn:disabled::after { display: none; }
-.hint { font-size: 12px; color: var(--seat); letter-spacing: .08em; min-height: 1.4em; }
+.hint { font-size: max(11px, calc(var(--t) * .019)); color: var(--seat); letter-spacing: .08em; min-height: 1.4em; }
 .hint button { background: none; border: 0; padding: 0; color: var(--silver); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px; color: var(--muted); font-size: .95em; }
 
 /* ---------- Winners ---------- */
-.winners { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.winners { display: flex; flex-direction: column; gap: 10px; }
 .winners-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
 .winners-head h2 { margin: 0; font-family: var(--display); font-weight: 500; font-size: 22px; }
 .winners-head h2 em { color: var(--muted); font-size: 18px; margin-left: .3em; }
-#winList { list-style: none; margin: 0; padding: 0 4px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 26vh; overflow-y: auto; scrollbar-width: thin; }
+#winList { list-style: none; margin: 0; padding: 0 4px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 30vh; overflow-y: auto; scrollbar-width: thin; }
 .win {
   width: 100%;
   border: 1px solid var(--line);
@@ -288,6 +270,59 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .win.new { animation: winIn .6s cubic-bezier(.2,.7,.2,1); border-color: var(--silver); }
 @keyframes winIn { from { opacity: 0; transform: translateY(8px); } }
 .empty { color: var(--seat); font-style: italic; font-family: var(--display); font-size: 17px; padding: 6px 0; }
+
+/* ---------- Settings menu ---------- */
+.menu {
+  position: fixed; inset: 0; z-index: 45;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: rgba(6,6,7,.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fadeIn .25s ease-out;
+}
+.menu-card {
+  width: min(600px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-top-color: var(--silver);
+  padding: clamp(20px, 3vw, 32px);
+  display: flex; flex-direction: column; gap: 22px;
+  animation: up .35s cubic-bezier(.2,.7,.2,1);
+}
+.menu-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.menu-head h2 { margin: 0; font-family: var(--display); font-weight: 500; font-size: 30px; line-height: 1; }
+.icon-btn { width: 40px; height: 40px; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); color: var(--muted); cursor: pointer; flex: none; }
+.icon-btn:hover { color: var(--fg); border-color: var(--seat); }
+.icon-btn svg { width: 16px; height: 16px; }
+.field { display: flex; flex-direction: column; gap: 10px; }
+.field .prize { width: 100%; text-align: left; padding-inline: 0; font-size: 24px; }
+.menu .count { justify-content: flex-start; }
+.switches { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; }
+.switch {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  background: transparent; border: 1px solid var(--line);
+  padding: 12px 14px; cursor: pointer; text-align: left;
+  font-size: 13px; color: var(--fg);
+  transition: border-color .2s;
+}
+.switch:hover { border-color: var(--seat); }
+.switch small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.knob { width: 34px; height: 18px; border: 1px solid var(--seat); border-radius: 9px; position: relative; flex: none; transition: background .2s, border-color .2s; }
+.knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--seat); transition: transform .2s, background .2s; }
+.switch[aria-pressed="true"] .knob { background: var(--silver); border-color: var(--silver); }
+.switch[aria-pressed="true"] .knob::after { transform: translateX(16px); background: var(--bg); }
+.menu-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.menu-row .tool { flex: 1; justify-content: center; min-width: 180px; }
+.menu-sep { border: 0; border-top: 1px solid var(--line); margin: 0; }
+.menu-done {
+  background: var(--fg); color: var(--bg); border: 0;
+  padding: 16px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase; font-size: 12px;
+  cursor: pointer;
+}
+.menu-done:hover { background: var(--white); }
 
 /* ---------- Reveal ---------- */
 .reveal {
@@ -445,8 +480,8 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 }
 
 @media (max-width: 560px) {
-  .tool span { display: none; }
-  .tool { padding: 9px 10px; }
+  .corner .tool span { display: none; }
+  .corner .tool { padding: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ring, .rays, .draw-btn::after { animation: none; }
@@ -456,62 +491,64 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 </head>
 <body>
 <div class="app">
-  <header class="top">
-    <div class="brand">
+  <main class="stage" id="stage">
+    <svg id="hall" role="img" aria-label="Схема залу: татамі в центрі, сектори 1–3 ліворуч, 4–6 праворуч"></svg>
+    <div class="console" id="console">
       <span class="eyebrow">Турнір · Гала-вечір</span>
-      <h1>Розіграш <em>призів</em></h1>
-    </div>
-    <div class="tools">
-      <button class="tool" id="editBtn" aria-pressed="false" title="Позначте місця, де ніхто не сидить">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M4 12 12 4"/></svg><span>Вільні місця</span>
-      </button>
-      <button class="tool" id="repeatBtn" aria-pressed="true" title="Місця, що вже виграли, не беруть участі">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 8.5 6.5 12 13 4.5"/></svg><span>Без повторів</span>
-      </button>
-      <button class="tool" id="soundBtn" aria-pressed="true" title="Звук">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 6h2.5l3.5-3v10L5 10H2.5z"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9"/></svg><span>Звук</span>
-      </button>
-      <button class="tool" id="fsBtn" title="На весь екран (F)">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg><span>Екран</span>
-      </button>
-      <button class="tool" id="resetBtn" title="Очистити список переможців">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg><span>Очистити</span>
-      </button>
-    </div>
-  </header>
-
-  <main class="layout">
-    <div class="stage" id="stage">
-      <svg id="hall" viewBox="-485 -565 970 1130" role="img" aria-label="Схема залу: татамі в центрі, сектори 1–3 ліворуч, 4–6 праворуч"></svg>
-    </div>
-    <div class="side">
-      <div class="panel" id="panel">
-        <div class="eyebrow"><span id="drawNo">Розіграш № 1</span><i></i><span id="poolCount">718 місць у грі</span></div>
-        <input class="prize" id="prize" type="text" maxlength="60" placeholder="Назва призу" autocomplete="off" aria-label="Назва призу">
-        <div class="count" role="group" aria-label="Кількість переможців">
-          <label class="count-label" for="count">Переможців</label>
-          <button class="count-btn" id="countMinus" type="button" aria-label="Менше переможців">−</button>
-          <input id="count" type="number" min="1" max="50" value="1" inputmode="numeric">
-          <button class="count-btn" id="countPlus" type="button" aria-label="Більше переможців">+</button>
-        </div>
-        <div class="reels">
-          <div class="reel" id="reelS"><span class="reel-label">Сектор</span><span class="reel-val">–</span></div>
-          <div class="reel" id="reelR"><span class="reel-label">Ряд</span><span class="reel-val">–</span></div>
-          <div class="reel" id="reelN"><span class="reel-label">Місце</span><span class="reel-val">–</span></div>
-        </div>
-        <button class="draw-btn" id="drawBtn">Розіграти</button>
-        <div class="hint" id="hint">або натисніть <kbd>Пробіл</kbd></div>
+      <h1 class="c-title placeholder" id="cTitle">Розіграш призів</h1>
+      <div class="eyebrow"><span id="drawNo">Розіграш № 1</span><i></i><span id="countInfo">1 переможець</span><i></i><span id="poolCount">718 місць у грі</span></div>
+      <div class="reels">
+        <div class="reel" id="reelS"><span class="reel-label">Сектор</span><span class="reel-val">–</span></div>
+        <div class="reel" id="reelR"><span class="reel-label">Ряд</span><span class="reel-val">–</span></div>
+        <div class="reel" id="reelN"><span class="reel-label">Місце</span><span class="reel-val">–</span></div>
       </div>
-
-      <section class="winners" aria-label="Переможці">
-        <div class="winners-head">
-          <h2>Переможці <em id="winCount"></em></h2>
-          <span class="eyebrow" id="hallStats">6 секторів · 30 рядів · 718 місць</span>
-        </div>
-        <ol id="winList"></ol>
-      </section>
+      <button class="draw-btn" id="drawBtn">Розіграти</button>
+      <div class="hint" id="hint">або натисніть <kbd>Пробіл</kbd></div>
     </div>
   </main>
+  <div class="corner">
+    <button class="tool" id="menuBtn" title="Налаштування (M)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/></svg><span>Меню</span></button>
+    <button class="tool" id="fsBtn" title="На весь екран (F)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg><span>Екран</span></button>
+  </div>
+</div>
+
+<div class="menu" id="menu" hidden>
+  <div class="menu-card" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+    <div class="menu-head">
+      <h2 id="menuTitle">Налаштування</h2>
+      <button class="icon-btn" id="menuClose" aria-label="Закрити меню"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>
+    </div>
+    <div class="field">
+      <label class="eyebrow" for="prize">Приз цього розіграшу</label>
+      <input class="prize" id="prize" type="text" maxlength="60" placeholder="Назва призу" autocomplete="off">
+    </div>
+    <div class="field">
+      <span class="eyebrow">Кількість переможців</span>
+      <div class="count" role="group" aria-label="Кількість переможців">
+        <button class="count-btn" id="countMinus" type="button" aria-label="Менше переможців">−</button>
+        <input id="count" type="number" min="1" max="50" value="1" inputmode="numeric" aria-label="Кількість переможців">
+        <button class="count-btn" id="countPlus" type="button" aria-label="Більше переможців">+</button>
+      </div>
+    </div>
+    <div class="switches">
+      <button class="switch" id="repeatBtn" aria-pressed="true"><span>Без повторів<small>Місця переможців більше не грають</small></span><span class="knob"></span></button>
+      <button class="switch" id="soundBtn" aria-pressed="true"><span>Звук<small>Клацання і фінальний дзвін</small></span><span class="knob"></span></button>
+      <button class="switch" id="autoFsBtn" aria-pressed="true"><span>Повний екран<small>Вмикати під час розіграшу</small></span><span class="knob"></span></button>
+    </div>
+    <div class="menu-row">
+      <button class="tool" id="editBtn" title="Позначте місця, де ніхто не сидить"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M4 12 12 4"/></svg><span>Позначити вільні місця</span></button>
+    </div>
+    <hr class="menu-sep">
+    <section class="winners" aria-label="Переможці">
+      <div class="winners-head">
+        <h2>Переможці <em id="winCount"></em></h2>
+        <button class="tool" id="resetBtn" title="Очистити список переможців"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg><span>Очистити</span></button>
+      </div>
+      <ol id="winList"></ol>
+      <span class="eyebrow" id="hallStats">6 секторів · 30 рядів · 718 місць</span>
+    </section>
+    <button class="menu-done" id="menuDone">Готово</button>
+  </div>
 </div>
 
 <div class="reveal" id="reveal" hidden>
@@ -549,7 +586,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   const DEG = Math.PI / 180;
   // Sectors stand in two columns facing the tatami; row 1 is nearest the mat, seat 1 at the top of each row.
   const COLUMNS = [{ side: -1, order: [2, 1, 0] }, { side: 1, order: [3, 4, 5] }];
-  const ROW1_X = 272, ROWGAP = 30, SEAT_GAP = 11, SECTOR_GAP = 60, SEAT_R = 3.7;
+  const ROWGAP = 30, SEAT_GAP = 11, SECTOR_GAP = 60, SEAT_R = 3.7, VIEW_H = 1200;
   const KEY = 'gala-draw-v1';
 
   const $ = id => document.getElementById(id);
@@ -569,15 +606,10 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
     <filter id="glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="7"/></filter>`;
-  el('circle', { r: 420, fill: 'url(#floor)' }, svg);
-  // tatami: safety area, warning band, contest area, start tapes
-  el('rect', { class: 'mat-safety', x: -212, y: -212, width: 424, height: 424 }, svg);
-  el('rect', { class: 'mat-zone', x: -176, y: -176, width: 352, height: 352 }, svg);
-  el('rect', { class: 'mat-contest', x: -156, y: -156, width: 312, height: 312 }, svg);
-  el('line', { class: 'mat-tape', x1: -46, y1: -12, x2: -46, y2: 12 }, svg);
-  el('line', { class: 'mat-tape', x1: 46, y1: -12, x2: 46, y2: 12 }, svg);
-  el('text', { class: 'mat-text', x: 5, y: -52, 'text-anchor': 'middle' }, svg).textContent = 'ТАТАМІ';
-  el('text', { class: 'mat-sub', x: 0, y: 72, 'text-anchor': 'middle' }, svg).textContent = 'гала-вечір';
+  const floor = el('circle', { fill: 'url(#floor)' }, svg);
+  // tatami: safety area, warning band, contest area (the console sits on the contest area)
+  const mat = ['mat-safety', 'mat-zone', 'mat-contest'].map(c => el('rect', { class: c }, svg));
+  const xMovers = []; // [element, side, offset from row 1] — repositioned when the screen shape changes
 
   const seats = [];        // flat list
   const sectorGroups = []; // index = sector - 1: {g, rows:[{g, seats:[]}]}
@@ -590,28 +622,28 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       const g = el('g', { class: 'sector' }, svg);
       const info = { g, rows: [] };
       rows.forEach((n, r) => {
-        const x = side * (ROW1_X + r * ROWGAP);
+        const x = 0;
         const rg = el('g', { class: 'row' }, g);
         const rowInfo = { g: rg, seats: [] };
         for (let i = 0; i < n; i++) {
           const y = cy + (i - (n - 1) / 2) * SEAT_GAP;
           const c = el('circle', { class: 'seat', cx: x, cy: y.toFixed(1), r: SEAT_R }, rg);
-          const seat = { s: s + 1, r: r + 1, n: i + 1, x, y, el: c, key: `${s + 1}-${r + 1}-${i + 1}` };
+          const seat = { s: s + 1, r: r + 1, n: i + 1, x, y, side, off: r * ROWGAP, el: c, key: `${s + 1}-${r + 1}-${i + 1}` };
           c.dataset.i = seats.length;
           seats.push(seat);
           rowInfo.seats.push(seat);
         }
         const t = el('text', { class: 'row-label', x, y: cy - (n - 1) / 2 * SEAT_GAP - 13, 'text-anchor': 'middle' }, rg);
         t.textContent = r + 1;
+        xMovers.push([t, side, r * ROWGAP]);
         info.rows.push(rowInfo);
       });
       // sector label along the outer edge
-      const lx = side * (ROW1_X + 4 * ROWGAP + 40), cx2 = side * (ROW1_X + 4 * ROWGAP + 66);
-      const rot = side * 90;
-      el('text', { class: 'sector-label', x: lx, y: cy, 'text-anchor': 'middle', transform: `rotate(${rot} ${lx} ${cy})` }, g)
-        .textContent = `СЕКТОР ${s + 1}`;
-      el('text', { class: 'sector-count', x: cx2, y: cy, 'text-anchor': 'middle', transform: `rotate(${rot} ${cx2} ${cy})` }, g)
-        .textContent = `${rows.reduce((a, b) => a + b, 0)} місць`;
+      const lab = el('text', { class: 'sector-label', y: cy, 'text-anchor': 'middle' }, g);
+      lab.textContent = `СЕКТОР ${s + 1}`;
+      const cnt = el('text', { class: 'sector-count', y: cy, 'text-anchor': 'middle' }, g);
+      cnt.textContent = `${rows.reduce((a, b) => a + b, 0)} місць`;
+      xMovers.push([lab, side, 4 * ROWGAP + 40, cy], [cnt, side, 4 * ROWGAP + 66, cy]);
       sectorGroups[s] = info;
       top += h + SECTOR_GAP;
     });
@@ -625,10 +657,45 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   const haloLayer = el('g', {}, svg);
 
   const TOTAL = seats.length;
+
+  // Fit the hall to the screen: sector columns move out to the edges, the tatami grows to fill the middle.
+  const consoleEl = $('console');
+  const portraitMQ = matchMedia('(max-aspect-ratio: 1/1)');
+  function layout() {
+    const portrait = portraitMQ.matches;
+    const box = $('stage').getBoundingClientRect();
+    const W = portrait ? 1000 : Math.max(1000, VIEW_H * box.width / Math.max(box.height, 1));
+    const row1 = W / 2 - (4 * ROWGAP + 100);
+    const T = Math.min(2 * row1 - 150, VIEW_H - 200, 940);
+    svg.setAttribute('viewBox', `${-W / 2} ${-VIEW_H / 2} ${W} ${VIEW_H}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    seats.forEach(x => { x.x = x.side * (row1 + x.off); x.el.setAttribute('cx', x.x); });
+    xMovers.forEach(([n, side, off, cy]) => {
+      const x = side * (row1 + off);
+      n.setAttribute('x', x);
+      if (cy !== undefined) n.setAttribute('transform', `rotate(${side * 90} ${x} ${cy})`);
+    });
+    [1, .83, .736].forEach((k, i) => {
+      const a = T * k;
+      mat[i].setAttribute('x', -a / 2); mat[i].setAttribute('y', -a / 2);
+      mat[i].setAttribute('width', a); mat[i].setAttribute('height', a);
+    });
+    floor.setAttribute('r', T * .95);
+    // keep winner rings and lights on their seats
+    ringLayer.querySelectorAll('.ring').forEach(c => c._seat && c.setAttribute('cx', c._seat.x));
+    haloLayer.querySelectorAll('.mini-halo').forEach(g => g._seat && (g.style.transform = `translate(${g._seat.x}px, ${g._seat.y}px)`));
+    if (!portrait) {
+      const scale = Math.min(box.width / W, box.height / VIEW_H);
+      consoleEl.style.setProperty('--t', `${(T * .736 * scale).toFixed(1)}px`);
+    } else consoleEl.style.removeProperty('--t');
+  }
+  layout();
+  addEventListener('resize', layout);
+  document.addEventListener('fullscreenchange', () => setTimeout(layout, 50));
   $('hallStats').textContent = `6 секторів · 30 рядів · ${TOTAL} місць`;
 
   // ---------- State ----------
-  let state = { history: [], excluded: [], noRepeat: true, sound: true, count: 1 };
+  let state = { history: [], excluded: [], noRepeat: true, sound: true, count: 1, autoFs: true };
   const MAX_COUNT = 50;
   try {
     const raw = localStorage.getItem(KEY);
@@ -663,16 +730,25 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     $('poolCount').textContent = `${p} ${plural(p, 'місце', 'місця', 'місць')} у грі`;
     $('drawNo').textContent = `Розіграш № ${nextDraw()}`;
     syncCount();
+    $('countInfo').textContent = `${state.count} ${plural(state.count, 'переможець', 'переможці', 'переможців')}`;
+    syncTitle();
     $('winCount').textContent = state.history.length ? state.history.length : '';
     if (!running) renderHint();
   }
+  function syncTitle() {
+    const v = $('prize').value.trim();
+    $('cTitle').textContent = v || 'Розіграш призів';
+    $('cTitle').classList.toggle('placeholder', !v);
+  }
+  $('prize').addEventListener('input', syncTitle);
   function renderHint() {
     const hint = $('hint');
     if (editing) {
       hint.innerHTML = `Торкніться місця, щоб виключити його · виключено ${excluded.size}` +
-        (excluded.size ? ` · <button id="clearEx">Повернути всі</button>` : '');
+        (excluded.size ? ` · <button id="clearEx">Повернути всі</button>` : '') + ` · <button id="editDone">Готово</button>`;
       const b = $('clearEx');
       if (b) b.onclick = () => { excluded.clear(); syncExcluded(); };
+      $('editDone').onclick = () => toggleEdit(false);
     } else {
       hint.innerHTML = 'або натисніть <kbd>Пробіл</kbd>';
     }
@@ -767,6 +843,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     const out = [];
     for (let i = 0; i < n; i++) {
       const c = el('circle', { class: 'ring', cx: seat.x, cy: seat.y, r: 6 }, ringLayer);
+      c._seat = seat;
       c.style.animationDelay = `${i * .8}s`;
       out.push(c);
     }
@@ -795,7 +872,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     $('countPlus').disabled = running || v >= max;
     $('count').disabled = running;
   }
-  function setCount(v) { state.count = v; syncCount(); save(); }
+  function setCount(v) { state.count = v; save(); updateInfo(); }
   $('countMinus').onclick = () => setCount(state.count - 1);
   $('countPlus').onclick = () => setCount(state.count + 1);
   $('count').addEventListener('change', e => setCount(parseInt(e.target.value, 10) || 1));
@@ -820,7 +897,13 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     const p = pool();
     if (!p.length) { toast('Усі місця вже брали участь. Очистьте список переможців або поверніть місця.'); return; }
     if (editing) toggleEdit(false);
+    closeMenu();
     running = true;
+    document.body.classList.add('running');
+    if (state.autoFs && !document.fullscreenElement) {
+      try { document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
+      await new Promise(r => setTimeout(r, 250));
+    }
     audio();
     const k = Math.min(Math.max(1, parseInt($('count').value, 10) || 1), p.length, MAX_COUNT);
     if (k < state.count) toast(`У грі лише ${p.length} ${plural(p.length, 'місце', 'місця', 'місць')}`);
@@ -905,7 +988,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       el('circle', { r: SEAT_R + 1, fill: '#ffffff' }, g);
       return { g, w, done: false };
     });
-    const place = (l, seat) => { l.g.style.transform = `translate(${seat.x}px, ${seat.y}px)`; };
+    const place = (l, seat) => { l.g._seat = seat; l.g.style.transform = `translate(${seat.x}px, ${seat.y}px)`; };
     lights.forEach(l => place(l, p[rnd(p.length)]));
     Object.values(reels).forEach(r => r.classList.add('active'));
 
@@ -954,6 +1037,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     renderWinners(recs.length);
     $('prize').value = '';
     running = false;
+    document.body.classList.remove('running');
     const btn = $('drawBtn');
     btn.disabled = false; btn.textContent = 'Розіграти ще';
     updateInfo();
@@ -1064,7 +1148,30 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     svg.classList.toggle('editing', on);
     renderHint();
   }
-  $('editBtn').onclick = () => { if (!running) toggleEdit(!editing); };
+  $('editBtn').onclick = () => { if (!running) { closeMenu(); toggleEdit(true); } };
+  const menu = $('menu');
+  function openMenu() {
+    if (running) return;
+    if (!reveal.hidden) hideReveal();
+    if (editing) toggleEdit(false);
+    menu.hidden = false;
+    setTimeout(() => $('prize').focus(), 60);
+  }
+  function closeMenu() {
+    if (menu.hidden) return;
+    menu.hidden = true;
+    syncTitle();
+    $('drawBtn').focus();
+  }
+  $('menuBtn').onclick = openMenu;
+  $('menuClose').onclick = closeMenu;
+  $('menuDone').onclick = closeMenu;
+  menu.addEventListener('click', e => { if (e.target === menu) closeMenu(); });
+  $('autoFsBtn').onclick = () => {
+    state.autoFs = !state.autoFs;
+    $('autoFsBtn').setAttribute('aria-pressed', state.autoFs);
+    save();
+  };
   $('repeatBtn').onclick = () => {
     state.noRepeat = !state.noRepeat;
     $('repeatBtn').setAttribute('aria-pressed', state.noRepeat);
@@ -1125,8 +1232,10 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 
   addEventListener('keydown', e => {
     const typing = e.target.tagName === 'INPUT';
-    if (e.key === 'Escape') { hideReveal(); if (editing) toggleEdit(false); return; }
-    if (typing) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); draw(); } return; }
+    if (e.key === 'Escape') { if (!menu.hidden) closeMenu(); else { hideReveal(); if (editing) toggleEdit(false); } return; }
+    if (typing) { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); closeMenu(); } return; }
+    if (!menu.hidden) return;
+    if (['m', 'M', 'ь', 'Ь'].includes(e.key) && !running) { openMenu(); return; }
     if (e.code === 'Space' || e.key === 'Enter') {
       if (e.target.tagName === 'BUTTON') return;
       e.preventDefault();
@@ -1138,6 +1247,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   // ---------- Init ----------
   $('repeatBtn').setAttribute('aria-pressed', state.noRepeat);
   $('soundBtn').setAttribute('aria-pressed', state.sound);
+  $('autoFsBtn').setAttribute('aria-pressed', state.autoFs);
   if (state.history.length) $('drawBtn').textContent = 'Розіграти ще';
   paintSeats(); renderWinners(); updateInfo();
   try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (e) {}
