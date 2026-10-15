@@ -270,18 +270,15 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .win-prize { color: var(--muted); font-family: var(--display); font-style: italic; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .win.new { animation: winIn .6s cubic-bezier(.2,.7,.2,1); border-color: var(--silver); }
 @keyframes winIn { from { opacity: 0; transform: translateY(8px); } }
-.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
-.filters label { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 90px; }
-.filters label span { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
-.filters select, .filters input {
-  height: 40px; width: 100%;
-  background: var(--bg-2); color: var(--fg);
-  border: 1px solid var(--line); padding: 0 10px;
-  font: 500 15px var(--body);
+.win-group {
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0 6px;
 }
-.filters select:focus, .filters input:focus { outline: none; border-color: var(--silver); }
-.filters .tool { height: 40px; }
-.filter-note { font-size: 12px; color: var(--muted); }
+.win-group:first-child { padding-top: 0; }
+.win-group b { font-family: var(--display); font-weight: 500; font-size: 22px; }
+.win-group span { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .empty { color: var(--seat); font-style: italic; font-family: var(--display); font-size: 17px; padding: 6px 0; }
 
 /* ---------- Settings menu ---------- */
@@ -557,12 +554,6 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
         <h2>Переможці <em id="winCount"></em></h2>
         <button class="tool" id="resetBtn" title="Очистити список переможців"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg><span>Очистити</span></button>
       </div>
-      <div class="filters" role="group" aria-label="Фільтр переможців">
-        <label><span>Сектор</span><select id="fS"><option value="">Усі</option></select></label>
-        <label><span>Ряд</span><select id="fR"><option value="">Усі</option></select></label>
-        <label><span>Місце</span><input id="fN" type="number" min="1" max="34" inputmode="numeric" placeholder="Усі"></label>
-        <button class="tool" id="fClear" type="button" hidden>Скинути</button>
-      </div>
       <ol id="winList"></ol>
       <span class="eyebrow" id="hallStats">6 секторів · 30 рядів · 718 місць</span>
     </section>
@@ -781,31 +772,34 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     state.excluded = [...excluded];
     save(); paintSeats(); updateInfo();
   }
-  [1, 2, 3, 4, 5, 6].forEach(v => $('fS').add(new Option(v, v)));
-  [1, 2, 3, 4, 5].forEach(v => $('fR').add(new Option(v, v)));
-  ['fS', 'fR', 'fN'].forEach(id => $(id).addEventListener('input', () => renderWinners()));
-  $('fClear').onclick = () => { $('fS').value = ''; $('fR').value = ''; $('fN').value = ''; renderWinners(); };
+  const bySeat = (a, b) => (a.h || a).s - (b.h || b).s || (a.h || a).r - (b.h || b).r || (a.h || a).n - (b.h || b).n;
   function renderWinners(fresh) {
     const list = $('winList');
     list.innerHTML = '';
-    const fs = $('fS').value, fr = $('fR').value, fn = $('fN').value.trim();
-    const filtered = !!(fs || fr || fn);
-    $('fClear').hidden = !filtered;
-    const items = [...state.history].reverse()
-      .map((h, i) => ({ h, i }))
-      .filter(({ h }) => (!fs || h.s == fs) && (!fr || h.r == fr) && (!fn || h.n == fn));
-    if (!items.length) {
+    if (!state.history.length) {
       const li = document.createElement('li');
       li.className = 'empty';
-      li.textContent = !state.history.length ? 'Тут з’являться переможці розіграшу' : 'Немає переможців на таких місцях';
+      li.textContent = 'Тут з’являться переможці розіграшу';
       list.appendChild(li);
       return;
     }
-    items.forEach(({ h, i }) => {
+    // sorted by sector, then row, then seat; grouped under a heading per sector
+    const freshFrom = state.history.length - (fresh || 0);
+    const items = state.history.map((h, i) => ({ h, isNew: i >= freshFrom })).sort(bySeat);
+    let group = 0;
+    items.forEach(({ h, isNew }) => {
+      if (h.s !== group) {
+        group = h.s;
+        const n = items.filter(x => x.h.s === group).length;
+        const head = document.createElement('li');
+        head.className = 'win-group';
+        head.innerHTML = `<b>Сектор ${group}</b><span>${n} ${plural(n, 'переможець', 'переможці', 'переможців')}</span>`;
+        list.appendChild(head);
+      }
       const li = document.createElement('li');
       const b = document.createElement('button');
-      b.className = 'win' + (i < fresh ? ' new' : '');
-      b.innerHTML = `<span class="win-no">${h.no}</span><span class="win-seat">Сектор ${h.s} · Ряд ${h.r} · Місце ${h.n}</span><span class="win-prize"></span>`;
+      b.className = 'win' + (isNew ? ' new' : '');
+      b.innerHTML = `<span class="win-no">${h.no}</span><span class="win-seat">Ряд ${h.r} · Місце ${h.n}</span><span class="win-prize"></span>`;
       b.querySelector('.win-prize').textContent = h.prize || `${h.time}`;
       b.title = 'Показати місце на схемі';
       b.onclick = () => {
@@ -1145,7 +1139,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     grid.hidden = !many;
     grid.classList.toggle('compact', recs.length > 8);
     grid.innerHTML = '';
-    if (many) recs.forEach((r, i) => {
+    if (many) recs.slice().sort(bySeat).forEach((r, i) => {
       const c = document.createElement('div');
       c.className = 'rg-card';
       c.style.animationDelay = `${.35 + Math.min(i, 24) * .07}s`;
