@@ -72,7 +72,8 @@ button:focus-visible, input:focus-visible { outline: 1px solid var(--silver); ou
 .tool svg { width: 15px; height: 15px; flex: none; }
 .corner {
   position: fixed; z-index: 30;
-  top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px;
+  top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%;
+  transform: translateX(-50%);
   display: flex; gap: 6px;
 }
 body.running .corner { opacity: .15; pointer-events: none; }
@@ -86,9 +87,9 @@ body.running .corner { opacity: .15; pointer-events: none; }
 #hall { display: block; width: 100%; height: auto; overflow: visible; user-select: none; }
 
 .seat { fill: var(--seat); transition: fill .45s ease-out; }
-.sector-label { fill: var(--muted); font-family: var(--body); font-size: 15px; font-weight: 600; letter-spacing: .3em; transition: fill .3s; }
-.sector-count { fill: var(--seat); font-family: var(--display); font-size: 17px; font-style: italic; letter-spacing: .04em; }
-.row-label { fill: var(--seat); font-family: var(--body); font-size: 10px; font-weight: 600; transition: fill .3s; }
+.sector-label { fill: var(--silver); font-family: var(--body); font-size: 24px; font-weight: 700; letter-spacing: .26em; transition: fill .3s; }
+.sector-count { fill: var(--muted); font-family: var(--display); font-size: 24px; font-style: italic; letter-spacing: .04em; }
+.row-label { fill: var(--muted); font-family: var(--body); font-size: 14px; font-weight: 600; transition: fill .3s; }
 .mat-safety { fill: var(--bg-2); stroke: var(--line); }
 .mat-zone { fill: #1d1d20; }
 .mat-contest { fill: #17171a; stroke: #3a3a3f; stroke-width: 1; }
@@ -269,6 +270,18 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .win-prize { color: var(--muted); font-family: var(--display); font-style: italic; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .win.new { animation: winIn .6s cubic-bezier(.2,.7,.2,1); border-color: var(--silver); }
 @keyframes winIn { from { opacity: 0; transform: translateY(8px); } }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.filters label { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 90px; }
+.filters label span { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.filters select, .filters input {
+  height: 40px; width: 100%;
+  background: var(--bg-2); color: var(--fg);
+  border: 1px solid var(--line); padding: 0 10px;
+  font: 500 15px var(--body);
+}
+.filters select:focus, .filters input:focus { outline: none; border-color: var(--silver); }
+.filters .tool { height: 40px; }
+.filter-note { font-size: 12px; color: var(--muted); }
 .empty { color: var(--seat); font-style: italic; font-family: var(--display); font-size: 17px; padding: 6px 0; }
 
 /* ---------- Settings menu ---------- */
@@ -544,6 +557,12 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
         <h2>Переможці <em id="winCount"></em></h2>
         <button class="tool" id="resetBtn" title="Очистити список переможців"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 9h5.6l.7-9"/></svg><span>Очистити</span></button>
       </div>
+      <div class="filters" role="group" aria-label="Фільтр переможців">
+        <label><span>Сектор</span><select id="fS"><option value="">Усі</option></select></label>
+        <label><span>Ряд</span><select id="fR"><option value="">Усі</option></select></label>
+        <label><span>Місце</span><input id="fN" type="number" min="1" max="34" inputmode="numeric" placeholder="Усі"></label>
+        <button class="tool" id="fClear" type="button" hidden>Скинути</button>
+      </div>
       <ol id="winList"></ol>
       <span class="eyebrow" id="hallStats">6 секторів · 30 рядів · 718 місць</span>
     </section>
@@ -586,7 +605,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   const DEG = Math.PI / 180;
   // Sectors stand in two columns facing the tatami; row 1 is nearest the mat, seat 1 at the top of each row.
   const COLUMNS = [{ side: -1, order: [2, 1, 0] }, { side: 1, order: [3, 4, 5] }];
-  const ROWGAP = 30, SEAT_GAP = 11, SECTOR_GAP = 60, SEAT_R = 3.7, VIEW_H = 1200;
+  const SEAT_GAP = 12.4, SECTOR_GAP = 40, SEAT_R = 4.7, VIEW_H = 1200;
   const KEY = 'gala-draw-v1';
 
   const $ = id => document.getElementById(id);
@@ -628,14 +647,14 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
         for (let i = 0; i < n; i++) {
           const y = cy + (i - (n - 1) / 2) * SEAT_GAP;
           const c = el('circle', { class: 'seat', cx: x, cy: y.toFixed(1), r: SEAT_R }, rg);
-          const seat = { s: s + 1, r: r + 1, n: i + 1, x, y, side, off: r * ROWGAP, el: c, key: `${s + 1}-${r + 1}-${i + 1}` };
+          const seat = { s: s + 1, r: r + 1, n: i + 1, x, y, side, ri: r, el: c, key: `${s + 1}-${r + 1}-${i + 1}` };
           c.dataset.i = seats.length;
           seats.push(seat);
           rowInfo.seats.push(seat);
         }
-        const t = el('text', { class: 'row-label', x, y: cy - (n - 1) / 2 * SEAT_GAP - 13, 'text-anchor': 'middle' }, rg);
+        const t = el('text', { class: 'row-label', x, y: cy - (n - 1) / 2 * SEAT_GAP - 16, 'text-anchor': 'middle' }, rg);
         t.textContent = r + 1;
-        xMovers.push([t, side, r * ROWGAP]);
+        xMovers.push([t, side, r, 0]);
         info.rows.push(rowInfo);
       });
       // sector label along the outer edge
@@ -643,7 +662,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       lab.textContent = `СЕКТОР ${s + 1}`;
       const cnt = el('text', { class: 'sector-count', y: cy, 'text-anchor': 'middle' }, g);
       cnt.textContent = `${rows.reduce((a, b) => a + b, 0)} місць`;
-      xMovers.push([lab, side, 4 * ROWGAP + 40, cy], [cnt, side, 4 * ROWGAP + 66, cy]);
+      xMovers.push([lab, side, 4, 46, cy], [cnt, side, 4, 82, cy]);
       sectorGroups[s] = info;
       top += h + SECTOR_GAP;
     });
@@ -665,13 +684,18 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     const portrait = portraitMQ.matches;
     const box = $('stage').getBoundingClientRect();
     const W = portrait ? 1000 : Math.max(1000, VIEW_H * box.width / Math.max(box.height, 1));
-    const row1 = W / 2 - (4 * ROWGAP + 100);
-    const T = Math.min(2 * row1 - 150, VIEW_H - 200, 940);
+    // a compact tatami; the sectors take the rest of the width (rows spread out, columns sit between mat and edge)
+    const LABELS = 140, MAT_GAP = 70;
+    const T = Math.max(260, Math.min(620, VIEW_H - 420, 2 * (W / 2 - LABELS - 4 * 34 - MAT_GAP)));
+    const near = T / 2 + MAT_GAP;
+    const G = Math.max(34, Math.min(62, (W / 2 - LABELS - near) / 4));
+    const far = W / 2 - LABELS - 4 * G;
+    const row1 = (near + Math.max(near, far)) / 2;
     svg.setAttribute('viewBox', `${-W / 2} ${-VIEW_H / 2} ${W} ${VIEW_H}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    seats.forEach(x => { x.x = x.side * (row1 + x.off); x.el.setAttribute('cx', x.x); });
-    xMovers.forEach(([n, side, off, cy]) => {
-      const x = side * (row1 + off);
+    seats.forEach(x => { x.x = x.side * (row1 + x.ri * G); x.el.setAttribute('cx', x.x); });
+    xMovers.forEach(([n, side, ri, extra, cy]) => {
+      const x = side * (row1 + ri * G + extra);
       n.setAttribute('x', x);
       if (cy !== undefined) n.setAttribute('transform', `rotate(${side * 90} ${x} ${cy})`);
     });
@@ -757,17 +781,27 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     state.excluded = [...excluded];
     save(); paintSeats(); updateInfo();
   }
+  [1, 2, 3, 4, 5, 6].forEach(v => $('fS').add(new Option(v, v)));
+  [1, 2, 3, 4, 5].forEach(v => $('fR').add(new Option(v, v)));
+  ['fS', 'fR', 'fN'].forEach(id => $(id).addEventListener('input', () => renderWinners()));
+  $('fClear').onclick = () => { $('fS').value = ''; $('fR').value = ''; $('fN').value = ''; renderWinners(); };
   function renderWinners(fresh) {
     const list = $('winList');
     list.innerHTML = '';
-    if (!state.history.length) {
+    const fs = $('fS').value, fr = $('fR').value, fn = $('fN').value.trim();
+    const filtered = !!(fs || fr || fn);
+    $('fClear').hidden = !filtered;
+    const items = [...state.history].reverse()
+      .map((h, i) => ({ h, i }))
+      .filter(({ h }) => (!fs || h.s == fs) && (!fr || h.r == fr) && (!fn || h.n == fn));
+    if (!items.length) {
       const li = document.createElement('li');
       li.className = 'empty';
-      li.textContent = 'Тут з’являться переможці розіграшу';
+      li.textContent = !state.history.length ? 'Тут з’являться переможці розіграшу' : 'Немає переможців на таких місцях';
       list.appendChild(li);
       return;
     }
-    [...state.history].reverse().forEach((h, i) => {
+    items.forEach(({ h, i }) => {
       const li = document.createElement('li');
       const b = document.createElement('button');
       b.className = 'win' + (i < fresh ? ' new' : '');
