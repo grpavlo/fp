@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: the hall fills the whole screen (sectors 3-2-1 left, 4-5-6 right); the draw console sits on the tatami in the centre; settings open in a menu over the tatami. */
+/* Layout: the hall fills the whole screen (sectors 6-5-4 left, 1-2-3 right); the draw console sits on the tatami in the centre; settings open in a menu over the tatami. */
 :root {
   --bg: #0a0a0b;
   --bg-2: #131315;
@@ -100,6 +100,9 @@ body.running .corner { opacity: .15; pointer-events: none; }
 #hall.editing .seat:hover { fill: var(--fg); }
 
 #hall.drawing .seat { fill: var(--seat-dim); }
+#hall .sector.blocked { opacity: .28; }
+#hall .sector.blocked .seat { fill: var(--seat-dim); }
+#hall .sector.blocked .sector-count { font-style: normal; font-family: var(--body); font-size: 15px; letter-spacing: .2em; text-transform: uppercase; }
 #hall.drawing .seat.spark { fill: var(--fg); transition: none; }
 #hall.drawing .sector.hl .seat { fill: var(--silver); transition: none; }
 #hall.drawing .sector.hl .sector-label { fill: var(--fg); }
@@ -324,6 +327,18 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .knob::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--seat); transition: transform .2s, background .2s; }
 .switch[aria-pressed="true"] .knob { background: var(--silver); border-color: var(--silver); }
 .switch[aria-pressed="true"] .knob::after { transform: translateX(16px); background: var(--bg); }
+.sec-chips { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.sec-chip {
+  height: 52px; cursor: pointer;
+  background: transparent; color: var(--muted);
+  border: 1px dashed var(--seat);
+  font-family: var(--display); font-size: 26px; font-weight: 500;
+  text-decoration: line-through; text-decoration-thickness: 1px;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.sec-chip[aria-pressed="true"] { background: var(--silver); color: var(--bg); border: 1px solid var(--silver); text-decoration: none; }
+.sec-chip:hover { border-color: var(--fg); }
+.sec-note { font-size: 12px; color: var(--muted); }
 .menu-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .menu-row .tool { flex: 1; justify-content: center; min-width: 180px; }
 .menu-sep { border: 0; border-top: 1px solid var(--line); margin: 0; }
@@ -383,7 +398,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .reveal-prize { font-size: clamp(13px, 1.3vw, 16px); letter-spacing: .26em; text-transform: uppercase; color: var(--silver); font-weight: 600; animation: up .8s .3s both cubic-bezier(.2,.7,.2,1); }
 .reveal-nums { display: flex; justify-content: center; align-items: stretch; width: 100%; }
 .rv {
-  flex: 1; max-width: 260px;
+  flex: 1; max-width: 460px;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding-inline: 8px;
   animation: up .9s both cubic-bezier(.2,.7,.2,1);
@@ -392,11 +407,11 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .rv:nth-child(1) { animation-delay: .45s; }
 .rv:nth-child(2) { animation-delay: .7s; }
 .rv:nth-child(3) { animation-delay: .95s; }
-.rv-label { font-size: clamp(10px, 1vw, 13px); letter-spacing: .34em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .34em; }
+.rv-label { font-size: clamp(12px, 1.5vw, 22px); letter-spacing: .34em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding-left: .34em; }
 .rv-num {
   font-family: var(--display);
   font-weight: 500;
-  font-size: clamp(72px, 13vw, 190px);
+  font-size: min(20vw, 36vh);
   line-height: .9;
   font-variant-numeric: lining-nums;
   background: linear-gradient(180deg, #ffffff 0%, #e6e6e6 45%, #9a9a9e 100%);
@@ -427,34 +442,40 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .mini-halo { pointer-events: none; transition: transform .18s ease-out; }
 
 .reveal-grid {
+  --ch: 120px;
   width: 100%;
-  max-height: 56vh;
+  max-height: calc(100dvh - 180px);
   overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-inline: auto;
+  gap: 12px;
   padding: 2px;
 }
+.reveal-card.wide { width: min(100%, 1880px); gap: clamp(10px, 1.6vh, 18px); padding: clamp(14px, 2.5vh, 28px) 8px; }
+.reveal-card.wide .reveal-title { font-size: clamp(30px, 3.6vw, 60px); }
 .rg-card {
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, rgba(255,255,255,.04), transparent 70%), var(--bg);
-  padding: 12px 10px 14px;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: 1px solid var(--seat);
+  background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 70%), var(--bg);
+  height: var(--ch);
+  width: var(--cw, 200px);
+  padding: calc(var(--ch) * .07) calc(var(--ch) * .06);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--ch) * .03);
   animation: up .7s both cubic-bezier(.2,.7,.2,1);
 }
-.rg-no { font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.rg-no { font-size: max(10px, calc(var(--ch) * .085)); letter-spacing: .3em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
 .rg-nums { display: flex; justify-content: center; width: 100%; }
-.rg-nums > span { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.rg-nums > span { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .rg-nums > span + span { border-left: 1px solid var(--line); }
 .rg-nums b {
   font-family: var(--display); font-weight: 500; line-height: 1;
-  font-size: clamp(34px, 3.6vw, 56px);
+  font-size: calc(var(--ch) * .5);
   font-variant-numeric: lining-nums;
   background: linear-gradient(180deg, #ffffff 0%, #e6e6e6 45%, #9a9a9e 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.rg-nums i { font-style: normal; font-size: 9px; letter-spacing: .22em; text-transform: uppercase; color: var(--seat); font-weight: 600; }
-.reveal-grid.compact .rg-nums b { font-size: clamp(26px, 2.4vw, 38px); }
+.rg-nums i { font-style: normal; font-size: max(9px, calc(var(--ch) * .075)); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; font-weight: 600; }
 .reveal-btn {
   margin-top: 6px;
   background: transparent;
@@ -502,7 +523,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 <body>
 <div class="app">
   <main class="stage" id="stage">
-    <svg id="hall" role="img" aria-label="Схема залу: татамі в центрі, сектори 1–3 ліворуч, 4–6 праворуч"></svg>
+    <svg id="hall" role="img" aria-label="Схема залу: татамі в центрі, сектори 6, 5, 4 ліворуч, 1, 2, 3 праворуч"></svg>
     <div class="console" id="console">
       <span class="eyebrow">Турнір · Гала-вечір</span>
       <h1 class="c-title placeholder" id="cTitle">Розіграш призів</h1>
@@ -539,6 +560,18 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
         <input id="count" type="number" min="1" max="50" value="1" inputmode="numeric" aria-label="Кількість переможців">
         <button class="count-btn" id="countPlus" type="button" aria-label="Більше переможців">+</button>
       </div>
+    </div>
+    <div class="field">
+      <span class="eyebrow">Сектори в розіграші</span>
+      <div class="sec-chips" role="group" aria-label="Сектори в розіграші">
+        <button class="sec-chip" id="sec1" aria-pressed="true">1</button>
+        <button class="sec-chip" id="sec2" aria-pressed="true">2</button>
+        <button class="sec-chip" id="sec3" aria-pressed="true">3</button>
+        <button class="sec-chip" id="sec4" aria-pressed="true">4</button>
+        <button class="sec-chip" id="sec5" aria-pressed="true">5</button>
+        <button class="sec-chip" id="sec6" aria-pressed="true">6</button>
+      </div>
+      <span class="sec-note" id="secNote">Натисніть на сектор, щоб вимкнути його з розіграшу</span>
     </div>
     <div class="switches">
       <button class="switch" id="repeatBtn" aria-pressed="true"><span>Без повторів<small>Місця переможців більше не грають</small></span><span class="knob"></span></button>
@@ -595,7 +628,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   const NS = 'http://www.w3.org/2000/svg';
   const DEG = Math.PI / 180;
   // Sectors stand in two columns facing the tatami; row 1 is nearest the mat, seat 1 at the top of each row.
-  const COLUMNS = [{ side: -1, order: [2, 1, 0] }, { side: 1, order: [3, 4, 5] }];
+  const COLUMNS = [{ side: -1, order: [5, 4, 3] }, { side: 1, order: [0, 1, 2] }];
   const SEAT_GAP = 12.4, SECTOR_GAP = 40, SEAT_R = 4.7, VIEW_H = 1200;
   const KEY = 'gala-draw-v1';
 
@@ -653,6 +686,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       lab.textContent = `СЕКТОР ${s + 1}`;
       const cnt = el('text', { class: 'sector-count', y: cy, 'text-anchor': 'middle' }, g);
       cnt.textContent = `${rows.reduce((a, b) => a + b, 0)} місць`;
+      info.count = cnt; info.total = rows.reduce((a, b) => a + b, 0);
       xMovers.push([lab, side, 4, 46, cy], [cnt, side, 4, 82, cy]);
       sectorGroups[s] = info;
       top += h + SECTOR_GAP;
@@ -710,7 +744,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   $('hallStats').textContent = `6 секторів · 30 рядів · ${TOTAL} місць`;
 
   // ---------- State ----------
-  let state = { history: [], excluded: [], noRepeat: true, sound: true, count: 1, autoFs: true };
+  let state = { history: [], excluded: [], blocked: [], noRepeat: true, sound: true, count: 1, autoFs: true };
   const MAX_COUNT = 50;
   try {
     const raw = localStorage.getItem(KEY);
@@ -724,7 +758,8 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   const wonKeys = () => new Set(state.history.map(h => h.key));
   const pool = () => {
     const won = state.noRepeat ? wonKeys() : new Set();
-    return seats.filter(x => !excluded.has(x.key) && !won.has(x.key));
+    const blocked = new Set(state.blocked);
+    return seats.filter(x => !blocked.has(x.s) && !excluded.has(x.key) && !won.has(x.key));
   };
   const plural = (n, one, few, many) => {
     const m10 = n % 10, m100 = n % 100;
@@ -739,6 +774,13 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
       x.el.classList.toggle('won', won.has(x.key));
       x.el.classList.toggle('excluded', excluded.has(x.key) && !won.has(x.key));
     });
+    sectorGroups.forEach((sg, i) => {
+      const off = state.blocked.includes(i + 1);
+      sg.g.classList.toggle('blocked', off);
+      sg.count.textContent = off ? 'не бере участі' : `${sg.total} місць`;
+      const chip = $('sec' + (i + 1));
+      if (chip) chip.setAttribute('aria-pressed', !off);
+    });
   }
   function updateInfo() {
     const p = pool().length;
@@ -747,6 +789,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     syncCount();
     $('countInfo').textContent = `${state.count} ${plural(state.count, 'переможець', 'переможці', 'переможців')}`;
     syncTitle();
+    $('secNote').textContent = state.blocked.length ? `Не беруть участі: ${state.blocked.map(n => 'сектор ' + n).join(', ')}` : 'Натисніть на сектор, щоб вимкнути його з розіграшу';
     $('winCount').textContent = state.history.length ? state.history.length : '';
     if (!running) renderHint();
   }
@@ -956,10 +999,12 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     // 2. sector
     reels.S.classList.add('active');
     let prev = null;
-    await cycle(6, winner.s - 1, 24, 45, 430, (i, last) => {
+    const live = [...new Set(p.map(x => x.s))].sort((a, b) => a - b);
+    const laps = live.length > 1 ? Math.max(12, live.length * 4) : 1;
+    await cycle(live.length, live.indexOf(winner.s), laps, 45, 430, (i, last) => {
       if (prev) prev.classList.remove('hl');
-      prev = sectorGroups[i].g; prev.classList.add('hl');
-      setReel('S', i + 1); tick(last ? 660 : 440);
+      prev = sectorGroups[live[i] - 1].g; prev.classList.add('hl');
+      setReel('S', live[i]); tick(last ? 660 : 440);
     });
     prev.classList.remove('hl');
     const sec = sectorGroups[winner.s - 1];
@@ -1128,6 +1173,24 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     }
     if (parts.length || snowing) raf = requestAnimationFrame(frame); else raf = 0;
   }
+  // Lay winner cards out as large as the screen allows: try every column count, keep the biggest card.
+  function fitGrid(k) {
+    const grid = $('revealGrid'), GAP = 12, RATIO = 1.75;
+    grid.style.maxWidth = '';
+    const availW = grid.clientWidth - 6;
+    const availH = Math.max(160, innerHeight - (reveal.querySelector('.reveal-card').offsetHeight - grid.offsetHeight) - 40);
+    let best = { h: 0, cols: 1 };
+    for (let cols = 1; cols <= k; cols++) {
+      const rows = Math.ceil(k / cols);
+      const h = Math.min((availH - GAP * (rows - 1)) / rows, (availW - GAP * (cols - 1)) / cols / RATIO, 300);
+      if (h > best.h) best = { h, cols };
+    }
+    const h = Math.max(best.h, 84);
+    grid.style.setProperty('--ch', `${Math.floor(h)}px`);
+    const cw = Math.floor(h * RATIO);
+    grid.style.setProperty('--cw', `${cw}px`);
+    grid.style.maxWidth = `${best.cols * cw + GAP * (best.cols - 1) + 6}px`;
+  }
   function showReveal(recs) {
     const rec = recs[0], many = recs.length > 1;
     $('revealNo').textContent = `Розіграш № ${rec.draw || rec.no}` + (many ? ` · ${recs.length} ${plural(recs.length, 'переможець', 'переможці', 'переможців')}` : '');
@@ -1137,7 +1200,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     $('revealSingle').hidden = many;
     const grid = $('revealGrid');
     grid.hidden = !many;
-    grid.classList.toggle('compact', recs.length > 8);
+    reveal.querySelector('.reveal-card').classList.toggle('wide', many);
     grid.innerHTML = '';
     if (many) recs.slice().sort(bySeat).forEach((r, i) => {
       const c = document.createElement('div');
@@ -1149,6 +1212,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     });
     $('rvS').textContent = rec.s; $('rvR').textContent = rec.r; $('rvN').textContent = rec.n;
     reveal.hidden = false;
+    if (many) fitGrid(recs.length);
     sizeCanvas();
     parts = [];
     if (!reduced) { burst(); snowing = true; if (!raf) raf = requestAnimationFrame(frame); }
@@ -1162,7 +1226,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   }
   $('revealClose').onclick = hideReveal;
   reveal.addEventListener('click', e => { if (e.target === reveal) hideReveal(); });
-  addEventListener('resize', () => { if (!reveal.hidden) sizeCanvas(); });
+  addEventListener('resize', () => { if (!reveal.hidden) { sizeCanvas(); if (!$('revealGrid').hidden) fitGrid($('revealGrid').children.length); } });
 
   // ---------- Controls ----------
   let toastT = 0;
@@ -1176,6 +1240,14 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     svg.classList.toggle('editing', on);
     renderHint();
   }
+  for (let i = 1; i <= 6; i++) $('sec' + i).onclick = () => {
+    if (running) return;
+    const set = new Set(state.blocked);
+    if (set.has(i)) set.delete(i); else set.add(i);
+    if (set.size === 6) { toast('Хоча б один сектор має брати участь'); return; }
+    state.blocked = [...set].sort();
+    save(); paintSeats(); updateInfo();
+  };
   $('editBtn').onclick = () => { if (!running) { closeMenu(); toggleEdit(true); } };
   const menu = $('menu');
   function openMenu() {
