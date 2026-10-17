@@ -358,7 +358,8 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   animation: fadeIn .5s ease-out;
-  overflow: hidden;
+  overflow: hidden auto;
+  place-items: safe center;
 }
 @keyframes fadeIn { from { opacity: 0; } }
 .rays {
@@ -444,7 +445,6 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .reveal-grid {
   --ch: 120px;
   width: 100%;
-  max-height: calc(100dvh - 180px);
   overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
@@ -1174,23 +1174,36 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     if (parts.length || snowing) raf = requestAnimationFrame(frame); else raf = 0;
   }
   // Lay winner cards out as large as the screen allows: try every column count, keep the biggest card.
-  function fitGrid(k) {
-    const grid = $('revealGrid'), GAP = 12, RATIO = 1.75;
-    grid.style.maxWidth = '';
-    const availW = grid.clientWidth - 6;
-    const availH = Math.max(160, innerHeight - (reveal.querySelector('.reveal-card').offsetHeight - grid.offsetHeight) - 40);
+  function fitGrid() {
+    const grid = $('revealGrid');
+    if (reveal.hidden || grid.hidden) return;
+    const k = grid.children.length, GAP = 12, RATIO = 1.75;
+    const card = reveal.querySelector('.reveal-card'), cs = getComputedStyle(card);
+    const px = v => parseFloat(v) || 0;
+    // space the screen leaves for the cards: overlay minus padding, minus everything else in the card
+    const availW = Math.min(reveal.clientWidth - 32, 1880) - px(cs.paddingLeft) - px(cs.paddingRight) - 8;
+    const others = [...card.children].filter(n => n !== grid && !n.hidden);
+    const used = others.reduce((a, n) => a + n.offsetHeight, 0) + px(cs.rowGap) * others.length
+      + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+    const availH = Math.max(120, reveal.clientHeight - 32 - used - 8);
     let best = { h: 0, cols: 1 };
     for (let cols = 1; cols <= k; cols++) {
       const rows = Math.ceil(k / cols);
-      const h = Math.min((availH - GAP * (rows - 1)) / rows, (availW - GAP * (cols - 1)) / cols / RATIO, 300);
+      const h = Math.min((availH - 14 - GAP * (rows - 1)) / rows, (availW - GAP * (cols - 1)) / cols / RATIO, 300);
       if (h > best.h) best = { h, cols };
     }
-    const h = Math.max(best.h, 84);
-    grid.style.setProperty('--ch', `${Math.floor(h)}px`);
-    const cw = Math.floor(h * RATIO);
+    const h = Math.floor(Math.max(best.h, 70)), cw = Math.floor(h * RATIO);
+    grid.style.setProperty('--ch', `${h}px`);
     grid.style.setProperty('--cw', `${cw}px`);
     grid.style.maxWidth = `${best.cols * cw + GAP * (best.cols - 1) + 6}px`;
+    grid.style.maxHeight = `${Math.floor(availH)}px`;
   }
+  // refit whenever the screen changes size (window, fullscreen, artifact viewer) and once fonts have loaded
+  let fitRaf = 0;
+  const refit = () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitGrid); };
+  try { new ResizeObserver(refit).observe(reveal); } catch (e) {}
+  try { document.fonts && document.fonts.ready.then(refit); } catch (e) {}
+
   function showReveal(recs) {
     const rec = recs[0], many = recs.length > 1;
     $('revealNo').textContent = `Розіграш № ${rec.draw || rec.no}` + (many ? ` · ${recs.length} ${plural(recs.length, 'переможець', 'переможці', 'переможців')}` : '');
@@ -1212,7 +1225,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     });
     $('rvS').textContent = rec.s; $('rvR').textContent = rec.r; $('rvN').textContent = rec.n;
     reveal.hidden = false;
-    if (many) fitGrid(recs.length);
+    if (many) { fitGrid(); refit(); }
     sizeCanvas();
     parts = [];
     if (!reduced) { burst(); snowing = true; if (!raf) raf = requestAnimationFrame(frame); }
@@ -1226,7 +1239,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   }
   $('revealClose').onclick = hideReveal;
   reveal.addEventListener('click', e => { if (e.target === reveal) hideReveal(); });
-  addEventListener('resize', () => { if (!reveal.hidden) { sizeCanvas(); if (!$('revealGrid').hidden) fitGrid($('revealGrid').children.length); } });
+  addEventListener('resize', () => { if (!reveal.hidden) { sizeCanvas(); refit(); } });
 
   // ---------- Controls ----------
   let toastT = 0;
