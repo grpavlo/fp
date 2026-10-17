@@ -358,7 +358,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   animation: fadeIn .5s ease-out;
-  overflow: hidden auto;
+  overflow: hidden;
   place-items: safe center;
 }
 @keyframes fadeIn { from { opacity: 0; } }
@@ -445,23 +445,20 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
 .reveal-grid {
   --ch: 120px;
   width: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-inline: auto;
-  gap: 12px;
+  display: grid;
+  gap: 10px;
   padding: 2px;
 }
-.reveal-card.wide { width: 100%; gap: clamp(8px, 1.4vh, 16px); padding: clamp(10px, 2vh, 24px) 0; }
-.reveal:has(.reveal-card.wide) { padding: 8px; }
-.reveal-card.wide .reveal-title { font-size: clamp(30px, 3.6vw, 60px); }
+/* several winners: the card fills the screen, the grid takes all height left under the title (cells are 1fr, so nothing can overflow) */
+.reveal.many { padding: 8px; }
+.reveal-card.wide { width: 100%; height: 100%; gap: clamp(6px, 1.2vh, 14px); padding: clamp(8px, 1.6vh, 20px) 0; }
+.reveal-card.wide .reveal-grid { flex: 1 1 0; min-height: 0; }
+.reveal-card.wide .reveal-title { font-size: clamp(28px, 3.4vw, 58px); }
 .rg-card {
   border: 1px solid var(--seat);
   background: linear-gradient(180deg, rgba(255,255,255,.05), transparent 70%), var(--bg);
-  height: var(--ch);
-  width: var(--cw, 200px);
-  padding: calc(var(--ch) * .07) calc(var(--ch) * .06);
+  min-width: 0; min-height: 0; overflow: hidden;
+  padding: calc(var(--ch) * .05);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--ch) * .03);
   animation: up .7s both cubic-bezier(.2,.7,.2,1);
 }
@@ -950,11 +947,11 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   $('count').addEventListener('change', e => setCount(parseInt(e.target.value, 10) || 1));
   $('count').addEventListener('input', e => { const v = parseInt(e.target.value, 10); if (v >= 1) { state.count = Math.min(v, maxCount()); save(); } });
 
-  async function shimmer(ms) {
+  async function shimmer(ms, list) {
     const end = performance.now() + ms * SPEED;
     while (performance.now() < end) {
       for (let k = 0; k < 26; k++) {
-        const x = seats[rnd(TOTAL)].el;
+        const x = list[rnd(list.length)].el;
         x.classList.add('spark');
         setTimeout(() => x.classList.remove('spark'), 90);
       }
@@ -993,7 +990,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     syncCount();
 
     // 1. shimmer across the whole hall
-    await shimmer(1100);
+    await shimmer(1100, p);
     if (k > 1) return drawMany(picked, p, prize, draw);
     const winner = picked[0];
 
@@ -1177,44 +1174,30 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   // Lay winner cards out as large as the screen allows: try every column count, keep the biggest card.
   function fitGrid() {
     const grid = $('revealGrid');
-    if (reveal.hidden || grid.hidden) return;
-    const k = grid.children.length, GAP = 10, RATIO = 1.75;
-    const card = reveal.querySelector('.reveal-card'), cs = getComputedStyle(card);
-    const px = v => parseFloat(v) || 0;
-    // cards use the full screen width; height is what the title and button leave over
-    const availW = card.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight) - 4;
-    const others = [...card.children].filter(n => n !== grid && !n.hidden);
-    const used = others.reduce((a, n) => a + n.offsetHeight, 0) + px(cs.rowGap) * others.length
-      + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
-    const availH = Math.max(120, Math.min(reveal.clientHeight, innerHeight) - px(getComputedStyle(reveal).paddingTop) * 2 - used - 6);
-    let best = { h: 0, cols: 1 };
+    if (reveal.hidden || grid.hidden || !grid.firstElementChild) return;
+    const k = grid.children.length, RATIO = 1.75;
+    // pick the column count that gives the biggest cards for this screen shape
+    const W = innerWidth - 16, H = innerHeight * .74;
+    let best = { s: 0, cols: 1 };
     for (let cols = 1; cols <= k; cols++) {
       const rows = Math.ceil(k / cols);
-      const h = Math.min((availH - 6 - GAP * (rows - 1)) / rows, (availW - GAP * (cols - 1)) / cols / RATIO, 320);
-      if (h > best.h) best = { h, cols };
+      const sz = Math.min((H - 10 * (rows - 1)) / rows, (W - 10 * (cols - 1)) / cols / RATIO);
+      if (sz > best.s) best = { s: sz, cols };
     }
-    const cols = best.cols;
-    const apply = h => {
-      // stretch cards sideways to fill the row edge to edge
-      const cw = Math.floor(Math.min((availW - GAP * (cols - 1)) / cols, h * 2.6));
-      grid.style.setProperty('--ch', `${Math.floor(h)}px`);
-      grid.style.setProperty('--cw', `${cw}px`);
-      grid.style.maxWidth = `${cols * cw + GAP * (cols - 1) + 4}px`;
-    };
-    grid.style.gap = `${GAP}px`;
-    grid.style.maxHeight = `${Math.floor(availH)}px`;
-    let h = Math.max(best.h, 60);
-    apply(h);
-    // safety net: if anything still overflows (odd zoom, late fonts), shrink until every card is visible
-    for (let n = 0; n < 30 && h > 60 && card.offsetHeight > reveal.clientHeight - 4; n++) {
-      h *= .95; apply(h);
-    }
+    const rows = Math.ceil(k / best.cols);
+    grid.style.gridTemplateColumns = `repeat(${best.cols}, minmax(0, 1fr))`;
+    grid.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+    // text size follows the real cell size the browser gave each card
+    const c = grid.firstElementChild;
+    const h = Math.max(40, Math.min(c.clientHeight, c.clientWidth / RATIO));
+    grid.style.setProperty('--ch', `${Math.floor(h)}px`);
   }
+
 
   // refit whenever the screen changes size (window, fullscreen, artifact viewer) and once fonts have loaded
   let fitRaf = 0;
   const refit = () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitGrid); };
-  try { new ResizeObserver(refit).observe(reveal); } catch (e) {}
+  try { const ro = new ResizeObserver(refit); ro.observe(reveal); ro.observe($('revealGrid')); } catch (e) {}
   try { document.fonts && document.fonts.ready.then(refit); } catch (e) {}
 
   function showReveal(recs) {
@@ -1227,6 +1210,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     const grid = $('revealGrid');
     grid.hidden = !many;
     reveal.querySelector('.reveal-card').classList.toggle('wide', many);
+    reveal.classList.toggle('many', many);
     grid.innerHTML = '';
     if (many) recs.slice().sort(bySeat).forEach((r, i) => {
       const c = document.createElement('div');
