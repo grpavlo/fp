@@ -453,7 +453,8 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   gap: 12px;
   padding: 2px;
 }
-.reveal-card.wide { width: min(100%, 1880px); gap: clamp(10px, 1.6vh, 18px); padding: clamp(14px, 2.5vh, 28px) 8px; }
+.reveal-card.wide { width: 100%; gap: clamp(8px, 1.4vh, 16px); padding: clamp(10px, 2vh, 24px) 0; }
+.reveal:has(.reveal-card.wide) { padding: 8px; }
 .reveal-card.wide .reveal-title { font-size: clamp(30px, 3.6vw, 60px); }
 .rg-card {
   border: 1px solid var(--seat);
@@ -1177,27 +1178,39 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
   function fitGrid() {
     const grid = $('revealGrid');
     if (reveal.hidden || grid.hidden) return;
-    const k = grid.children.length, GAP = 12, RATIO = 1.75;
+    const k = grid.children.length, GAP = 10, RATIO = 1.75;
     const card = reveal.querySelector('.reveal-card'), cs = getComputedStyle(card);
     const px = v => parseFloat(v) || 0;
-    // space the screen leaves for the cards: overlay minus padding, minus everything else in the card
-    const availW = Math.min(reveal.clientWidth - 32, 1880) - px(cs.paddingLeft) - px(cs.paddingRight) - 8;
+    // cards use the full screen width; height is what the title and button leave over
+    const availW = card.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight) - 4;
     const others = [...card.children].filter(n => n !== grid && !n.hidden);
     const used = others.reduce((a, n) => a + n.offsetHeight, 0) + px(cs.rowGap) * others.length
       + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
-    const availH = Math.max(120, reveal.clientHeight - 32 - used - 8);
+    const availH = Math.max(120, Math.min(reveal.clientHeight, innerHeight) - px(getComputedStyle(reveal).paddingTop) * 2 - used - 6);
     let best = { h: 0, cols: 1 };
     for (let cols = 1; cols <= k; cols++) {
       const rows = Math.ceil(k / cols);
-      const h = Math.min((availH - 14 - GAP * (rows - 1)) / rows, (availW - GAP * (cols - 1)) / cols / RATIO, 300);
+      const h = Math.min((availH - 6 - GAP * (rows - 1)) / rows, (availW - GAP * (cols - 1)) / cols / RATIO, 320);
       if (h > best.h) best = { h, cols };
     }
-    const h = Math.floor(Math.max(best.h, 70)), cw = Math.floor(h * RATIO);
-    grid.style.setProperty('--ch', `${h}px`);
-    grid.style.setProperty('--cw', `${cw}px`);
-    grid.style.maxWidth = `${best.cols * cw + GAP * (best.cols - 1) + 6}px`;
+    const cols = best.cols;
+    const apply = h => {
+      // stretch cards sideways to fill the row edge to edge
+      const cw = Math.floor(Math.min((availW - GAP * (cols - 1)) / cols, h * 2.6));
+      grid.style.setProperty('--ch', `${Math.floor(h)}px`);
+      grid.style.setProperty('--cw', `${cw}px`);
+      grid.style.maxWidth = `${cols * cw + GAP * (cols - 1) + 4}px`;
+    };
+    grid.style.gap = `${GAP}px`;
     grid.style.maxHeight = `${Math.floor(availH)}px`;
+    let h = Math.max(best.h, 60);
+    apply(h);
+    // safety net: if anything still overflows (odd zoom, late fonts), shrink until every card is visible
+    for (let n = 0; n < 30 && h > 60 && card.offsetHeight > reveal.clientHeight - 4; n++) {
+      h *= .95; apply(h);
+    }
   }
+
   // refit whenever the screen changes size (window, fullscreen, artifact viewer) and once fonts have loaded
   let fitRaf = 0;
   const refit = () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitGrid); };
@@ -1225,7 +1238,7 @@ kbd { font-family: var(--body); border: 1px solid var(--line); padding: 1px 6px;
     });
     $('rvS').textContent = rec.s; $('rvR').textContent = rec.r; $('rvN').textContent = rec.n;
     reveal.hidden = false;
-    if (many) { fitGrid(); refit(); }
+    if (many) { fitGrid(); refit(); setTimeout(refit, 2800); }
     sizeCanvas();
     parts = [];
     if (!reduced) { burst(); snowing = true; if (!raf) raf = requestAnimationFrame(frame); }
